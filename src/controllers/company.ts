@@ -1,0 +1,415 @@
+import db from "@/config/db";
+import { Request, Response } from "express";
+import bcrypt from "bcrypt";
+import {
+  sendListResponse,
+  sendResponse,
+  calculationSkip,
+  calculationTotalPages,
+} from "@/utils";
+import { MESSAGE_CODES, DEFAULT_PAGE, DEFAULT_SIZE } from "@/constants";
+import {
+  approveCompanySchema,
+  createCompanySchema,
+  updateCompanySchema,
+} from "@/validations/company";
+import { Role } from "@prisma/client";
+
+export const createCompany = async (req: Request, res: Response) => {
+  try {
+    const parsed = createCompanySchema.safeParse(req.body);
+    if (!parsed.success) {
+      sendResponse(res, {
+        status: 400,
+        success: false,
+        error_code: MESSAGE_CODES.VALIDATION.VALIDATION_ERROR,
+        errors: parsed.error.errors.map((err) => ({
+          field: err.path.join("."),
+          error_code: err.message,
+        })),
+      });
+      return;
+    }
+
+    const {
+      email,
+      password,
+      name,
+      description,
+      address,
+      provinceId,
+      website,
+      taxCode,
+      businessLicensePath,
+      logo,
+    } = parsed.data;
+
+    const existing = await db.account.findFirst({ where: { email } });
+    if (existing) {
+      sendResponse(res, {
+        status: 400,
+        success: false,
+        error_code: MESSAGE_CODES.VALIDATION.EMAIL_ALREADY_EXISTS,
+      });
+      return;
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const account = await db.account.create({
+      data: {
+        email,
+        password: hashedPassword,
+        role: Role.COMPANY,
+      },
+    });
+
+    const company = await db.company.create({
+      data: {
+        email,
+        name,
+        description,
+        address,
+        provinceId,
+        website,
+        taxCode,
+        businessLicensePath,
+        logo,
+        accountId: account.id,
+      },
+    });
+
+    sendResponse(res, {
+      status: 201,
+      success: true,
+      data: company,
+      message_code: MESSAGE_CODES.SUCCESS.CREATED_SUCCESS,
+    });
+  } catch (error) {
+    console.error(error);
+    sendResponse(res, {
+      status: 500,
+      success: false,
+      error_code: MESSAGE_CODES.SEVER.INTERNAL_SERVER_ERROR,
+    });
+  }
+};
+
+export const getCompanies = async (req: Request, res: Response) => {
+  try {
+    const page = parseInt(req.query.page as string) || DEFAULT_PAGE;
+    const size = parseInt(req.query.size as string) || DEFAULT_SIZE;
+    const skip = calculationSkip(page, size);
+    const search = (req.query.search as string)?.trim().toLowerCase() || "";
+    const status = parseInt(req.query.status as string) ?? -1; // -1 for all, 0 for active, 1 for locked
+    const province = (req.query.province as string)?.trim().toLowerCase() || "";
+
+    let accountCondition: any = {};
+    if (status === 0) {
+      accountCondition = { isLocked: true };
+    } else if (status === 1) {
+      accountCondition = { isLocked: false };
+    }
+
+    const whereClause = {
+      status: { in: [0, 1] },
+      ...(search && {
+        OR: [{ email: { contains: search } }, { name: { contains: search } }],
+      }),
+      ...(status !== -1 && {
+        account: {
+          ...accountCondition,
+        },
+      }),
+      ...(province && {
+        province: {
+          name: {
+            contains: province,
+          },
+        },
+      }),
+    };
+
+    const total = await db.company.count({ where: whereClause });
+    const totalPages = calculationTotalPages(total, size);
+
+    const companies = await db.company.findMany({
+      where: whereClause,
+      skip,
+      take: size,
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        description: true,
+        address: true,
+        website: true,
+        logo: true,
+        taxCode: true,
+        businessLicensePath: true,
+        status: true,
+        reasonReject: true,
+        createdAt: true,
+        updatedAt: true,
+        accountId: true,
+        account: {
+          select: {
+            isLocked: true,
+          },
+        },
+        province: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
+    if (companies) {
+      sendListResponse(res, {
+        status: 200,
+        success: true,
+        data: companies,
+        pagination: {
+          total,
+          page,
+          size,
+          totalPages,
+        },
+        message_code: MESSAGE_CODES.SUCCESS.GET_ALL_SUCCESS,
+      });
+      return;
+    }
+    sendResponse(res, {
+      status: 404,
+      success: true,
+      data: [],
+      error_code: MESSAGE_CODES.SUCCESS.NOT_FOUND,
+    });
+  } catch (error) {
+    console.error(error);
+    sendResponse(res, {
+      status: 500,
+      success: false,
+      error_code: MESSAGE_CODES.SEVER.INTERNAL_SERVER_ERROR,
+    });
+    return;
+  }
+};
+
+export const getCompanyById = async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id;
+
+    if (!id) {
+      sendResponse(res, {
+        status: 400,
+        success: false,
+        message_code: MESSAGE_CODES.VALIDATION.ID_REQUIRED,
+      });
+      return;
+    }
+
+    const company = await db.company.findUnique({
+      where: {
+        id: id,
+        status: {
+          in: [0, 1],
+        },
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        description: true,
+        address: true,
+        website: true,
+        logo: true,
+        taxCode: true,
+        businessLicensePath: true,
+        status: true,
+        reasonReject: true,
+        createdAt: true,
+        updatedAt: true,
+        accountId: true,
+        account: {
+          select: {
+            isLocked: true,
+          },
+        },
+        province: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    });
+    if (!company) {
+      sendResponse(res, {
+        status: 404,
+        success: false,
+        error_code: MESSAGE_CODES.SUCCESS.NOT_FOUND,
+      });
+      return;
+    }
+    sendResponse(res, {
+      status: 200,
+      success: true,
+      data: company,
+      message_code: MESSAGE_CODES.SUCCESS.GET_SUCCESS,
+    });
+  } catch (error) {
+    console.error(error);
+    sendResponse(res, {
+      status: 500,
+      success: false,
+      error_code: MESSAGE_CODES.SEVER.INTERNAL_SERVER_ERROR,
+    });
+  }
+};
+
+export const updateCompany = async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id;
+
+    if (!id) {
+      sendResponse(res, {
+        status: 400,
+        success: false,
+        message_code: MESSAGE_CODES.VALIDATION.ID_REQUIRED,
+      });
+      return;
+    }
+
+    const parsed = updateCompanySchema.safeParse(req.body);
+    if (!parsed.success) {
+      sendResponse(res, {
+        status: 400,
+        success: false,
+        error_code: MESSAGE_CODES.VALIDATION.VALIDATION_ERROR,
+        errors: parsed.error.errors.map((err) => ({
+          field: err.path.join("."),
+          error_code: err.message,
+        })),
+      });
+      return;
+    }
+
+    const { description, address, provinceId, website, logo } = parsed.data;
+
+    //check if company exists
+    const existingCompany = await db.company.findUnique({
+      where: {
+        id,
+        status: 1,
+      },
+    });
+    if (!existingCompany) {
+      sendResponse(res, {
+        status: 404,
+        success: false,
+        error_code: MESSAGE_CODES.SUCCESS.NOT_FOUND,
+      });
+      return;
+    }
+
+    const updatedCompany = await db.company.update({
+      where: {
+        id,
+      },
+      data: {
+        description,
+        address,
+        provinceId,
+        website,
+        logo,
+      },
+    });
+    if (updatedCompany) {
+      sendResponse(res, {
+        status: 200,
+        success: true,
+        data: updatedCompany,
+        message_code: MESSAGE_CODES.SUCCESS.UPDATED_SUCCESS,
+      });
+      return;
+    }
+  } catch (error) {
+    console.error(error);
+    sendResponse(res, {
+      status: 500,
+      success: false,
+      error_code: MESSAGE_CODES.SEVER.INTERNAL_SERVER_ERROR,
+    });
+  }
+};
+
+export const approveCompany = async (req: Request, res: Response) => {
+  try {
+    const companyId = req.params.id;
+
+    const parsed = approveCompanySchema.safeParse(req.body);
+    if (!parsed.success) {
+      sendResponse(res, {
+        status: 400,
+        success: false,
+        error_code: MESSAGE_CODES.VALIDATION.VALIDATION_ERROR,
+        errors: parsed.error.errors.map((err) => ({
+          field: err.path.join("."),
+          error_code: err.message,
+        })),
+      });
+      return;
+    }
+
+    const { status, reasonReject } = parsed.data;
+
+    if (!companyId) {
+      sendResponse(res, {
+        status: 400,
+        success: false,
+        message_code: MESSAGE_CODES.VALIDATION.ID_REQUIRED,
+      });
+      return;
+    }
+
+    const company = await db.company.findUnique({
+      where: { id: companyId, status: -1 },
+    });
+
+    if (!company) {
+      sendResponse(res, {
+        status: 404,
+        success: false,
+        error_code: MESSAGE_CODES.SUCCESS.NOT_FOUND,
+      });
+      return;
+    }
+
+    const updatedCompany = await db.company.update({
+      where: { id: companyId },
+      data: {
+        status,
+        reasonReject: status === 0 ? reasonReject : null,
+      },
+    });
+
+    sendResponse(res, {
+      status: 200,
+      success: true,
+      data: updatedCompany,
+      message_code: MESSAGE_CODES.SUCCESS.UPDATED_SUCCESS,
+    });
+  } catch (error) {
+    console.error(error);
+    sendResponse(res, {
+      status: 500,
+      success: false,
+      error_code: MESSAGE_CODES.SEVER.INTERNAL_SERVER_ERROR,
+    });
+  }
+};

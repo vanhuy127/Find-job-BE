@@ -1,0 +1,212 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  COMPANY
+  ADMIN
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum JobType {
+  FULL_TIME
+  PART_TIME
+  INTERNSHIP
+  FREELANCE
+  REMOTE
+}
+
+enum JobLevel {
+  INTERN
+  FRESHER
+  JUNIOR
+  MID
+  SENIOR
+  LEAD
+}
+
+enum ApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Account {
+  id           String    @id @default(uuid())
+  email        String
+  password     String
+  role         Role      @default(USER)
+  isLocked     Boolean   @default(false)
+  resetToken   String?
+  resetExpires DateTime?
+
+  user    User?    @relation("UserAccount")
+  company Company? @relation("CompanyAccount")
+}
+
+model User {
+  id        String    @id @default(uuid())
+  email     String    @unique
+  username  String
+  fullName  String
+  phone     String    @unique
+  dob       DateTime
+  address   String
+  gender    Gender    @default(MALE)
+  createdAt DateTime  @default(now()) @db.Timestamp(6)
+  updatedAt DateTime? @updatedAt @db.Timestamp(6)
+
+  account   Account? @relation("UserAccount", fields: [accountId], references: [id])
+  accountId String?  @unique
+
+  applications Application[]
+  skills       UserSkill[]
+  reviews      CompanyReview[]
+}
+
+model Company {
+  id                  String    @id @default(uuid())
+  email               String    @unique
+  name                String
+  description         String?   @db.Text
+  address             String
+  provinceId          String
+  website             String?
+  logo                String
+  taxCode             String
+  businessLicensePath String
+  status              Int       @default(-1) // -1: pending, 0: rejected, 1: approved
+  reasonReject        String?
+  createdAt           DateTime  @default(now()) @db.Timestamp(6)
+  updatedAt           DateTime? @updatedAt @db.Timestamp(6)
+
+  accountId String?  @unique
+  account   Account? @relation("CompanyAccount", fields: [accountId], references: [id])
+  province  Province @relation(fields: [provinceId], references: [id])
+
+  jobs        Job[]
+  reviews     CompanyReview[]
+  vipPackages Company_VipPackage[]
+}
+
+model Job {
+  id              String    @id @default(uuid())
+  title           String
+  description     String    @db.Text
+  address         String
+  provinceId      String
+  jobType         JobType
+  numApplications Int
+  level           JobLevel
+  salaryMin       Int
+  salaryMax       Int
+  endDate         DateTime
+  companyId       String
+  createdAt       DateTime  @default(now()) @db.Timestamp(6)
+  updatedAt       DateTime? @updatedAt @db.Timestamp(6)
+  isDeleted       Boolean   @default(false)
+
+  company      Company       @relation(fields: [companyId], references: [id])
+  province     Province      @relation(fields: [provinceId], references: [id])
+  applications Application[]
+  skills       JobSkill[]
+}
+
+model Application {
+  id          String            @id @default(uuid())
+  userId      String
+  jobId       String
+  coverLetter String?           @db.Text
+  resumePath  String
+  status      ApplicationStatus @default(PENDING)
+  createdAt   DateTime          @default(now()) @db.Timestamp(6)
+  updatedAt   DateTime?         @updatedAt @db.Timestamp(6)
+
+  user User @relation(fields: [userId], references: [id])
+  job  Job  @relation(fields: [jobId], references: [id])
+}
+
+model Skill {
+  id        String    @id @default(uuid())
+  name      String
+  createdAt DateTime  @default(now()) @db.Timestamp(6)
+  updatedAt DateTime? @updatedAt @db.Timestamp(6)
+  isDeleted Boolean   @default(false)
+
+  userSkills UserSkill[]
+  jobSkills  JobSkill[]
+}
+
+model UserSkill {
+  userId  String
+  skillId String
+
+  user  User  @relation(fields: [userId], references: [id])
+  skill Skill @relation(fields: [skillId], references: [id])
+
+  @@id([userId, skillId])
+}
+
+model JobSkill {
+  jobId   String
+  skillId String
+
+  job   Job   @relation(fields: [jobId], references: [id])
+  skill Skill @relation(fields: [skillId], references: [id])
+
+  @@id([jobId, skillId])
+}
+
+model CompanyReview {
+  id        String   @id @default(uuid())
+  comment   String
+  companyId String
+  userId    String
+  createdAt DateTime @default(now()) @db.Timestamp(6)
+
+  company Company @relation(fields: [companyId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+}
+
+model VipPackage {
+  id          String   @id @default(uuid())
+  name        String
+  numPost     Int
+  price       Int
+  durationDay Int
+  createdAt   DateTime @default(now()) @db.Timestamp(6)
+  isDeleted   Boolean  @default(false)
+
+  companyPackages Company_VipPackage[]
+}
+
+model Company_VipPackage {
+  id           String   @id @default(uuid())
+  companyId    String
+  vipPackageId String
+  startDate    DateTime
+  endDate      DateTime
+  createdAt    DateTime @default(now()) @db.Timestamp(6)
+
+  company    Company    @relation(fields: [companyId], references: [id])
+  vipPackage VipPackage @relation(fields: [vipPackageId], references: [id])
+}
+
+model Province {
+  id   String @id @default(uuid())
+  name String @unique
+
+  companies Company[]
+  jobs      Job[]
+}
