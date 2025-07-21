@@ -12,8 +12,8 @@ export const jobSchema = z.object({
   level: z.enum(JOB_LEVEL_ARRAY, {
     errorMap: () => ({ message: "Invalid level" }),
   }),
-  numApplications: z.number().min(0, "Number of applications must be >= 0"),
-  salaryMin: z.number().min(0, "Minimum salary must be >= 0"),
-  salaryMax: z.number().min(0, "Maximum salary must be >= 0"),
+  numApplications: z.number().min(1, "Number of applications must be > 0"),
+  salaryMin: z.number().min(1000, "Minimum salary must be >= 1000"),
+  salaryMax: z.number().min(1000, "Maximum salary must be >= 1000"),
   endDate: z.string().regex(DOB_REGEX, "End date must be in dd-MM-yyyy format"),
 });

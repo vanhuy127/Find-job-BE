@@ -383,14 +383,18 @@ export const getJobById = async (req: Request, res: Response) => {
       where: { id, isDeleted: false },
       include: {
         province: true,
-        _count: {
-          select: { applications: true },
-        },
         skills: {
           include: {
             skill: true,
           },
         },
+      },
+    });
+
+    const approvedCount = await db.application.count({
+      where: {
+        jobId: id,
+        status: "APPROVED",
       },
     });
 
@@ -408,7 +412,7 @@ export const getJobById = async (req: Request, res: Response) => {
       success: true,
       data: {
         ...job,
-        numApplications: job._count.applications,
+        numApplicationsApproved: approvedCount,
         skills: job.skills.map((js) => js.skill),
       },
     });
@@ -462,11 +466,24 @@ export const updateJob = async (req: Request, res: Response) => {
       endDate,
     } = parsed.data;
 
+    const parsedEndDate = parseDate(endDate, DATE_FORMAT);
+    if (!isValid(parsedEndDate)) {
+      sendResponse(res, {
+        status: 400,
+        success: false,
+        error_code: MESSAGE_CODES.VALIDATION.INVALID_DATE_FORMAT,
+      });
+      return;
+    }
+
     //check if company exists
     const existingJob = await db.job.findUnique({
       where: {
         id,
         isDeleted: false,
+      },
+      include: {
+        applications: true,
       },
     });
     if (!existingJob) {
@@ -474,6 +491,17 @@ export const updateJob = async (req: Request, res: Response) => {
         status: 404,
         success: false,
         error_code: MESSAGE_CODES.SUCCESS.NOT_FOUND,
+      });
+      return;
+    }
+
+    const applicationCount = existingJob.applications.length;
+
+    if (applicationCount < existingJob.numApplications) {
+      sendResponse(res, {
+        status: 404,
+        success: false,
+        error_code: MESSAGE_CODES.VALIDATION.INVALID_NUM_APPLICATIONS,
       });
       return;
     }
@@ -492,7 +520,7 @@ export const updateJob = async (req: Request, res: Response) => {
         numApplications,
         salaryMin,
         salaryMax,
-        endDate,
+        endDate: parsedEndDate,
         provinceId: province,
       },
     });
@@ -539,6 +567,24 @@ export const deleteJob = async (req: Request, res: Response) => {
         status: 404,
         success: false,
         error_code: MESSAGE_CODES.SUCCESS.NOT_FOUND,
+      });
+      return;
+    }
+
+    //kiểm tra xem khóa chính có tồn tại ở bảng khác hay không
+    const applicationCount = await db.application.count({
+      where: { jobId: id },
+    });
+
+    const jobSkillCount = await db.jobSkill.count({
+      where: { jobId: id },
+    });
+
+    if (applicationCount > 0 || jobSkillCount > 0) {
+      sendResponse(res, {
+        status: 400,
+        success: false,
+        error_code: MESSAGE_CODES.VALIDATION.IN_USE,
       });
       return;
     }
