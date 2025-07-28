@@ -7,6 +7,7 @@ import companyRouter from "./routes/company";
 import provinceRouter from "./routes/province";
 import jobRouter from "./routes/job";
 import skillRouter from "./routes/skill";
+import resumeRouter from "./routes/resume";
 
 require("dotenv").config();
 
@@ -40,6 +41,7 @@ app.use("/api/v1", companyRouter);
 app.use("/api/v1", provinceRouter);
 app.use("/api/v1", jobRouter);
 app.use("/api/v1", skillRouter);
+app.use("/api/v1", resumeRouter);
 
 // const rateLimitErrorHandler: express.ErrorRequestHandler = (
 //   err,
