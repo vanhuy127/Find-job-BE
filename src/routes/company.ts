@@ -3,7 +3,9 @@ import {
   getCompanies,
   getCompanyById,
   updateCompany,
-  approveCompany,
+  getCompaniesWithoutApproved,
+  getCompanyPendingById,
+  changeStatusCompany,
 } from "@/controllers/company";
 
 import { authenticate } from "@/middlewares/authenticate";
@@ -13,7 +15,7 @@ import express from "express";
 
 const companyRouter = express.Router();
 
-companyRouter.post("/admin/company", createCompany);
+companyRouter.post("/company", createCompany);
 
 companyRouter.get(
   "/admin/companies",
@@ -29,6 +31,13 @@ companyRouter.get(
   getCompanyById
 );
 
+companyRouter.get(
+  "/admin/company/pending/:id",
+  authenticate,
+  authorize(Role.ADMIN),
+  getCompanyPendingById
+);
+
 companyRouter.put(
   "/admin/company/:id",
   authenticate,
@@ -37,10 +46,17 @@ companyRouter.put(
 );
 
 companyRouter.patch(
-  "/admin/company/:id/approval",
+  "/admin/company/:id/change-status",
   authenticate,
   authorize(Role.ADMIN),
-  approveCompany
+  changeStatusCompany
+);
+
+companyRouter.get(
+  "/admin/companies/pending",
+  authenticate,
+  authorize(Role.ADMIN),
+  getCompaniesWithoutApproved
 );
 
 export default companyRouter;

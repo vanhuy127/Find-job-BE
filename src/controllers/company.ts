@@ -111,7 +111,7 @@ export const getCompanies = async (req: Request, res: Response) => {
     }
 
     const whereClause = {
-      status: { in: [0, 1] },
+      status: 1, // 1 for active companies
       ...(search && {
         OR: [{ email: { contains: search } }, { name: { contains: search } }],
       }),
@@ -216,9 +216,7 @@ export const getCompanyById = async (req: Request, res: Response) => {
     const company = await db.company.findUnique({
       where: {
         id: id,
-        status: {
-          in: [0, 1],
-        },
+        status: 1, // 1 for active companies
       },
       select: {
         id: true,
@@ -248,6 +246,77 @@ export const getCompanyById = async (req: Request, res: Response) => {
         },
       },
     });
+    if (!company) {
+      sendResponse(res, {
+        status: 404,
+        success: false,
+        error_code: MESSAGE_CODES.SUCCESS.NOT_FOUND,
+      });
+      return;
+    }
+    sendResponse(res, {
+      status: 200,
+      success: true,
+      data: company,
+      message_code: MESSAGE_CODES.SUCCESS.GET_SUCCESS,
+    });
+  } catch (error) {
+    console.error(error);
+    sendResponse(res, {
+      status: 500,
+      success: false,
+      error_code: MESSAGE_CODES.SEVER.INTERNAL_SERVER_ERROR,
+    });
+  }
+};
+
+export const getCompanyPendingById = async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id;
+
+    if (!id) {
+      sendResponse(res, {
+        status: 400,
+        success: false,
+        message_code: MESSAGE_CODES.VALIDATION.ID_REQUIRED,
+      });
+      return;
+    }
+
+    const company = await db.company.findUnique({
+      where: {
+        id: id,
+        status: { in: [-1, 0] }, // -1 for pending, 0 for rejected
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        description: true,
+        address: true,
+        website: true,
+        logo: true,
+        taxCode: true,
+        businessLicensePath: true,
+        status: true,
+        reasonReject: true,
+        createdAt: true,
+        updatedAt: true,
+        accountId: true,
+        account: {
+          select: {
+            isLocked: true,
+          },
+        },
+        province: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    });
+
     if (!company) {
       sendResponse(res, {
         status: 404,
@@ -348,25 +417,113 @@ export const updateCompany = async (req: Request, res: Response) => {
   }
 };
 
-export const approveCompany = async (req: Request, res: Response) => {
+export const getCompaniesWithoutApproved = async (
+  req: Request,
+  res: Response
+) => {
   try {
-    const companyId = req.params.id;
+    const page = parseInt(req.query.page as string) || DEFAULT_PAGE;
+    const size = parseInt(req.query.size as string) || DEFAULT_SIZE;
+    const skip = calculationSkip(page, size);
+    const search = (req.query.search as string)?.trim().toLowerCase() || "";
+    const province = (req.query.province as string)?.trim().toLowerCase() || "";
+    const status = (req.query.status as string)?.trim().toLowerCase() || "all";
 
-    const parsed = approveCompanySchema.safeParse(req.body);
-    if (!parsed.success) {
-      sendResponse(res, {
-        status: 400,
-        success: false,
-        error_code: MESSAGE_CODES.VALIDATION.VALIDATION_ERROR,
-        errors: parsed.error.errors.map((err) => ({
-          field: err.path.join("."),
-          error_code: err.message,
-        })),
+    let companyCondition: any = {};
+    if (status === "pending") {
+      companyCondition = { status: -1 };
+    } else if (status === "rejected") {
+      companyCondition = { status: 0 };
+    }
+
+    const whereClause = {
+      status: { in: [-1, 0] },
+      ...(search && {
+        OR: [{ email: { contains: search } }, { name: { contains: search } }],
+      }),
+      ...(province && {
+        province: {
+          name: {
+            contains: province,
+          },
+        },
+      }),
+      ...(status !== "all" && {
+        ...companyCondition,
+      }),
+    };
+
+    const total = await db.company.count({ where: whereClause });
+    const totalPages = calculationTotalPages(total, size);
+
+    const companies = await db.company.findMany({
+      where: whereClause,
+      skip,
+      take: size,
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        description: true,
+        address: true,
+        website: true,
+        logo: true,
+        taxCode: true,
+        businessLicensePath: true,
+        status: true,
+        reasonReject: true,
+        createdAt: true,
+        updatedAt: true,
+        accountId: true,
+        province: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
+    if (companies) {
+      sendListResponse(res, {
+        status: 200,
+        success: true,
+        data: companies,
+        pagination: {
+          total,
+          page,
+          size,
+          totalPages,
+        },
+        message_code: MESSAGE_CODES.SUCCESS.GET_ALL_SUCCESS,
       });
       return;
     }
+    sendResponse(res, {
+      status: 404,
+      success: true,
+      data: [],
+      error_code: MESSAGE_CODES.SUCCESS.NOT_FOUND,
+    });
+  } catch (error) {
+    console.error(error);
+    sendResponse(res, {
+      status: 500,
+      success: false,
+      error_code: MESSAGE_CODES.SEVER.INTERNAL_SERVER_ERROR,
+    });
+    return;
+  }
+};
 
-    const { status, reasonReject } = parsed.data;
+export const changeStatusCompany = async (req: Request, res: Response) => {
+  try {
+    const companyId = req.params.id;
+
+    const { status, reasonReject } = req.body;
 
     if (!companyId) {
       sendResponse(res, {
