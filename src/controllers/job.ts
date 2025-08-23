@@ -40,6 +40,7 @@ export const createJob = async (req: Request, res: Response) => {
       salaryMin,
       salaryMax,
       endDate,
+      skills,
     } = parsed.data;
 
     const parsedEndDate = parseDate(endDate, DATE_FORMAT);
@@ -83,6 +84,18 @@ export const createJob = async (req: Request, res: Response) => {
         company: { connect: { id: company.id } },
         numApplications,
         province: { connect: { id: province } },
+        skills: {
+          create: skills.map((skill) => ({
+            skill: { connect: { id: skill } },
+          })),
+        },
+      },
+      include: {
+        skills: {
+          include: {
+            skill: true,
+          },
+        },
       },
     });
 
@@ -160,29 +173,18 @@ export const getJobs = async (req: Request, res: Response) => {
       where: whereClause,
       skip,
       take: size,
-      select: {
-        id: true,
-        title: true,
-        description: true,
-        address: true,
-        jobType: true,
-        level: true,
-        numApplications: true,
-        salaryMin: true,
-        salaryMax: true,
-        endDate: true,
-        createdAt: true,
-        updatedAt: true,
-        province: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
+      include: {
+        province: true,
         company: {
           select: {
             id: true,
             name: true,
+            logo: true,
+          },
+        },
+        skills: {
+          include: {
+            skill: true,
           },
         },
       },
@@ -195,7 +197,132 @@ export const getJobs = async (req: Request, res: Response) => {
       sendListResponse(res, {
         status: 200,
         success: true,
-        data: jobs,
+        data: jobs.map((job) => ({
+          ...job,
+          skills: job.skills.map((skill) => ({
+            id: skill.skill.id,
+            name: skill.skill.name,
+          })),
+        })),
+        pagination: {
+          total,
+          page,
+          size,
+          totalPages,
+        },
+        message_code: MESSAGE_CODES.SUCCESS.GET_ALL_SUCCESS,
+      });
+      return;
+    }
+    sendResponse(res, {
+      status: 404,
+      success: true,
+      data: [],
+      error_code: MESSAGE_CODES.SUCCESS.NOT_FOUND,
+    });
+  } catch (error) {
+    console.error(error);
+    sendResponse(res, {
+      status: 500,
+      success: false,
+      error_code: MESSAGE_CODES.SEVER.INTERNAL_SERVER_ERROR,
+    });
+    return;
+  }
+};
+
+export const getJobsForUser = async (req: Request, res: Response) => {
+  try {
+    const page = parseInt(req.query.page as string) || DEFAULT_PAGE;
+    const size = parseInt(req.query.size as string) || DEFAULT_SIZE;
+    const skip = calculationSkip(page, size);
+    const search = (req.query.search as string)?.trim().toLowerCase() || "";
+    const province = (req.query.province as string)?.trim().toLowerCase() || "";
+    const jobType = (req.query.jobType as string)?.trim().toLowerCase() || "";
+    const level = (req.query.level as string)?.trim().toLowerCase() || "";
+
+    const jobTypeValue = Object.values(JobType).includes(
+      jobType.toUpperCase() as JobType
+    )
+      ? (jobType.toUpperCase() as JobType)
+      : undefined;
+
+    const levelValue = Object.values(JobLevel).includes(
+      level.toUpperCase() as JobLevel
+    )
+      ? (level.toUpperCase() as JobLevel)
+      : undefined;
+
+    const whereClause = {
+      isDeleted: false,
+      endDate: {
+        gte: new Date(), // endDate >= ngày hiện tại
+      },
+      ...(search && {
+        OR: [
+          { title: { contains: search } },
+          { address: { contains: search } },
+        ],
+      }),
+      ...(province && {
+        province: {
+          name: {
+            contains: province,
+          },
+        },
+      }),
+      ...(jobType && {
+        jobType: {
+          equals: jobTypeValue,
+        },
+      }),
+      ...(level && {
+        level: {
+          equals: levelValue,
+        },
+      }),
+    };
+
+    const total = await db.job.count({
+      where: whereClause,
+    });
+    const totalPages = calculationTotalPages(total, size);
+
+    const jobs = await db.job.findMany({
+      where: whereClause,
+      skip,
+      take: size,
+      include: {
+        province: true,
+        company: {
+          select: {
+            id: true,
+            name: true,
+            logo: true,
+          },
+        },
+        skills: {
+          include: {
+            skill: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
+    if (jobs) {
+      sendListResponse(res, {
+        status: 200,
+        success: true,
+        data: jobs.map((job) => ({
+          ...job,
+          skills: job.skills.map((skill) => ({
+            id: skill.skill.id,
+            name: skill.skill.name,
+          })),
+        })),
         pagination: {
           total,
           page,
@@ -464,6 +591,7 @@ export const updateJob = async (req: Request, res: Response) => {
       salaryMin,
       salaryMax,
       endDate,
+      skills,
     } = parsed.data;
 
     const parsedEndDate = parseDate(endDate, DATE_FORMAT);
@@ -494,10 +622,10 @@ export const updateJob = async (req: Request, res: Response) => {
       });
       return;
     }
-
+    //số lương đơn đã nộp
     const applicationCount = existingJob.applications.length;
 
-    if (applicationCount < existingJob.numApplications) {
+    if (applicationCount > existingJob.numApplications) {
       sendResponse(res, {
         status: 404,
         success: false,
@@ -506,33 +634,56 @@ export const updateJob = async (req: Request, res: Response) => {
       return;
     }
 
-    const updatedJob = await db.job.update({
-      where: {
-        id,
-        isDeleted: false,
-      },
-      data: {
-        title,
-        description,
-        address,
-        jobType,
-        level,
-        numApplications,
-        salaryMin,
-        salaryMax,
-        endDate: parsedEndDate,
-        provinceId: province,
+    // 🟢 Transaction để đảm bảo atomic update
+    const updatedJob = await db.$transaction(async (tx) => {
+      // update job fields
+      const job = await tx.job.update({
+        where: { id, isDeleted: false },
+        data: {
+          title,
+          description,
+          address,
+          jobType,
+          level,
+          numApplications,
+          salaryMin,
+          salaryMax,
+          endDate: parsedEndDate,
+          provinceId: province,
+        },
+      });
+
+      if (skills && Array.isArray(skills)) {
+        // xóa skills cũ
+        await tx.jobSkill.deleteMany({
+          where: { jobId: id },
+        });
+
+        // tạo lại skills mới
+        await tx.jobSkill.createMany({
+          data: skills.map((skillId: string) => ({
+            jobId: id,
+            skillId,
+          })),
+        });
+      }
+
+      return job;
+    });
+
+    const jobWithSkills = await db.job.findUnique({
+      where: { id },
+      include: {
+        skills: { include: { skill: true } },
       },
     });
-    if (updatedJob) {
-      sendResponse(res, {
-        status: 200,
-        success: true,
-        data: updatedJob,
-        message_code: MESSAGE_CODES.SUCCESS.UPDATED_SUCCESS,
-      });
-      return;
-    }
+
+    sendResponse(res, {
+      status: 200,
+      success: true,
+      data: jobWithSkills,
+      message_code: MESSAGE_CODES.SUCCESS.UPDATED_SUCCESS,
+    });
   } catch (error) {
     console.error(error);
     sendResponse(res, {

@@ -200,6 +200,116 @@ export const getCompanies = async (req: Request, res: Response) => {
   }
 };
 
+export const getCompaniesForUser = async (req: Request, res: Response) => {
+  try {
+    const page = parseInt(req.query.page as string) || DEFAULT_PAGE;
+    const size = parseInt(req.query.size as string) || DEFAULT_SIZE;
+    const skip = calculationSkip(page, size);
+    const search = (req.query.search as string)?.trim().toLowerCase() || "";
+    const province = (req.query.province as string)?.trim().toLowerCase() || "";
+
+    const whereClause = {
+      status: 1, // 1 for active companies
+      account: {
+        isLocked: false,
+      },
+      ...(search && {
+        OR: [{ email: { contains: search } }, { name: { contains: search } }],
+      }),
+      ...(province && {
+        province: {
+          name: {
+            contains: province,
+          },
+        },
+      }),
+    };
+
+    const total = await db.company.count({ where: whereClause });
+    const totalPages = calculationTotalPages(total, size);
+
+    const companiesRaw = await db.company.findMany({
+      where: whereClause,
+      skip,
+      take: size,
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        description: true,
+        address: true,
+        website: true,
+        logo: true,
+        createdAt: true,
+        updatedAt: true,
+        accountId: true,
+        account: {
+          select: {
+            isLocked: true,
+          },
+        },
+        province: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        _count: {
+          select: {
+            jobs: {
+              where: {
+                isDeleted: false,
+                endDate: {
+                  gte: new Date(), // chỉ tính job còn hạn
+                },
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
+    const companies = companiesRaw.map((c) => ({
+      ...c,
+      jobCount: c._count.jobs,
+      _count: undefined, // muốn bỏ hẳn _count
+    }));
+
+    if (companies) {
+      sendListResponse(res, {
+        status: 200,
+        success: true,
+        data: companies,
+        pagination: {
+          total,
+          page,
+          size,
+          totalPages,
+        },
+        message_code: MESSAGE_CODES.SUCCESS.GET_ALL_SUCCESS,
+      });
+      return;
+    }
+    sendResponse(res, {
+      status: 404,
+      success: true,
+      data: [],
+      error_code: MESSAGE_CODES.SUCCESS.NOT_FOUND,
+    });
+  } catch (error) {
+    console.error(error);
+    sendResponse(res, {
+      status: 500,
+      success: false,
+      error_code: MESSAGE_CODES.SEVER.INTERNAL_SERVER_ERROR,
+    });
+    return;
+  }
+};
+
 export const getCompanyById = async (req: Request, res: Response) => {
   try {
     const id = req.params.id;

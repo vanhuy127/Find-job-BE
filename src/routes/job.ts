@@ -1,3 +1,4 @@
+import { getJobsForUser } from "./../controllers/job";
 import {
   createJob,
   getJobs,
@@ -13,7 +14,9 @@ import express from "express";
 
 const jobRouter = express.Router();
 
-jobRouter.get("/admin/jobs", getJobs);
+jobRouter.get("/admin/jobs", authenticate, authorize(Role.ADMIN), getJobs);
+
+jobRouter.get("/jobs", getJobsForUser);
 
 jobRouter.get(
   "/company/jobs/current-company",

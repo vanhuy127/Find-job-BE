@@ -6,6 +6,7 @@ import {
   getCompaniesWithoutApproved,
   getCompanyPendingById,
   changeStatusCompany,
+  getCompaniesForUser,
 } from "@/controllers/company";
 
 import { authenticate } from "@/middlewares/authenticate";
@@ -23,6 +24,8 @@ companyRouter.get(
   authorize(Role.ADMIN),
   getCompanies
 );
+
+companyRouter.get("/companies", getCompaniesForUser);
 
 companyRouter.get(
   "/admin/company/:id",

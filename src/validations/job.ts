@@ -16,4 +16,5 @@ export const jobSchema = z.object({
   salaryMin: z.number().min(1000, "Minimum salary must be >= 1000"),
   salaryMax: z.number().min(1000, "Maximum salary must be >= 1000"),
   endDate: z.string().regex(DOB_REGEX, "End date must be in dd-MM-yyyy format"),
+  skills: z.array(z.string()).nonempty("Vui lòng chọn ít nhất 1 kỹ năng"),
 });
