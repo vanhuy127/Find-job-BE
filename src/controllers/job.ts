@@ -7,7 +7,7 @@ import {
   calculationSkip,
   calculationTotalPages,
 } from "@/utils";
-import { isValid } from "date-fns";
+import { isValid, min } from "date-fns";
 import { DATE_FORMAT } from "@/constants/date";
 import { DEFAULT_PAGE, DEFAULT_SIZE, MESSAGE_CODES } from "@/constants";
 import { jobSchema } from "@/validations";
@@ -240,6 +240,27 @@ export const getJobsForUser = async (req: Request, res: Response) => {
     const province = (req.query.province as string)?.trim().toLowerCase() || "";
     const jobType = (req.query.jobType as string)?.trim().toLowerCase() || "";
     const level = (req.query.level as string)?.trim().toLowerCase() || "";
+    const minSalaryParam = req.query.minSalary
+      ? parseInt(req.query.minSalary as string)
+      : undefined;
+
+    const maxSalaryParam = req.query.maxSalary
+      ? parseInt(req.query.maxSalary as string)
+      : undefined;
+
+    let skills: string[] = [];
+
+    const rawSkills = req.query["skills[]"];
+
+    if (rawSkills) {
+      if (Array.isArray(rawSkills)) {
+        // ép kiểu từng phần tử sang string
+        skills = rawSkills.map((s) => String(s).trim());
+      } else {
+        // chỉ có 1 giá trị
+        skills = [String(rawSkills).trim()];
+      }
+    }
 
     const jobTypeValue = Object.values(JobType).includes(
       jobType.toUpperCase() as JobType
@@ -262,6 +283,11 @@ export const getJobsForUser = async (req: Request, res: Response) => {
         OR: [
           { title: { contains: search } },
           { address: { contains: search } },
+          {
+            company: {
+              name: { contains: search },
+            },
+          },
         ],
       }),
       ...(province && {
@@ -279,6 +305,21 @@ export const getJobsForUser = async (req: Request, res: Response) => {
       ...(level && {
         level: {
           equals: levelValue,
+        },
+      }),
+      ...(minSalaryParam && {
+        salaryMax: { gt: minSalaryParam },
+      }),
+      ...(maxSalaryParam && {
+        salaryMin: { lt: maxSalaryParam },
+      }),
+      ...(skills.length > 0 && {
+        skills: {
+          some: {
+            skill: {
+              name: { in: skills },
+            },
+          },
         },
       }),
     };
