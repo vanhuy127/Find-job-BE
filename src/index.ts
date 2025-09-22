@@ -12,6 +12,7 @@ import resumeRouter from "./routes/resume";
 require("dotenv").config();
 
 const cors = require("cors");
+const morgan = require("morgan");
 const app = express();
 
 app.use(cookieParser());
@@ -21,7 +22,7 @@ app.use(
     credentials: true,
   })
 );
-
+app.use(morgan("dev"));
 const PORT = process.env.PORT || 8000;
 
 // const limiter = rateLimit({

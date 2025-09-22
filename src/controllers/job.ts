@@ -6,6 +6,7 @@ import {
   parseDate,
   calculationSkip,
   calculationTotalPages,
+  DATE_SETTINGS,
 } from "@/utils";
 import { isValid, min } from "date-fns";
 import { DATE_FORMAT } from "@/constants/date";
@@ -277,7 +278,7 @@ export const getJobsForUser = async (req: Request, res: Response) => {
     const whereClause = {
       isDeleted: false,
       endDate: {
-        gte: new Date(), // endDate >= ngày hiện tại
+        gte: DATE_SETTINGS.todayStart,
       },
       ...(search && {
         OR: [

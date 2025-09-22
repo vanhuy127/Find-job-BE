@@ -7,6 +7,8 @@ import {
   getCompanyPendingById,
   changeStatusCompany,
   getCompaniesForUser,
+  getCompanyByIdForUser,
+  getJobsCurrentCompanyById,
 } from "@/controllers/company";
 
 import { authenticate } from "@/middlewares/authenticate";
@@ -26,6 +28,10 @@ companyRouter.get(
 );
 
 companyRouter.get("/companies", getCompaniesForUser);
+
+companyRouter.get("/company/:id", getCompanyByIdForUser);
+
+companyRouter.get("/company/:id/jobs", getJobsCurrentCompanyById);
 
 companyRouter.get(
   "/admin/company/:id",

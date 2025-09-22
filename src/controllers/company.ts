@@ -6,10 +6,10 @@ import {
   sendResponse,
   calculationSkip,
   calculationTotalPages,
+  DATE_SETTINGS,
 } from "@/utils";
 import { MESSAGE_CODES, DEFAULT_PAGE, DEFAULT_SIZE } from "@/constants";
 import {
-  approveCompanySchema,
   createCompanySchema,
   updateCompanySchema,
 } from "@/validations/company";
@@ -260,7 +260,7 @@ export const getCompaniesForUser = async (req: Request, res: Response) => {
               where: {
                 isDeleted: false,
                 endDate: {
-                  gte: new Date(), // chỉ tính job còn hạn
+                  gte: DATE_SETTINGS.todayStart,
                 },
               },
             },
@@ -283,6 +283,215 @@ export const getCompaniesForUser = async (req: Request, res: Response) => {
         status: 200,
         success: true,
         data: companies,
+        pagination: {
+          total,
+          page,
+          size,
+          totalPages,
+        },
+        message_code: MESSAGE_CODES.SUCCESS.GET_ALL_SUCCESS,
+      });
+      return;
+    }
+    sendResponse(res, {
+      status: 404,
+      success: true,
+      data: [],
+      error_code: MESSAGE_CODES.SUCCESS.NOT_FOUND,
+    });
+  } catch (error) {
+    console.error(error);
+    sendResponse(res, {
+      status: 500,
+      success: false,
+      error_code: MESSAGE_CODES.SEVER.INTERNAL_SERVER_ERROR,
+    });
+    return;
+  }
+};
+
+export const getCompanyByIdForUser = async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id;
+
+    if (!id) {
+      sendResponse(res, {
+        status: 400,
+        success: false,
+        message_code: MESSAGE_CODES.VALIDATION.ID_REQUIRED,
+      });
+      return;
+    }
+
+    const companyRaw = await db.company.findUnique({
+      where: {
+        id: id,
+        status: 1, // 1 for active companies
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        description: true,
+        address: true,
+        website: true,
+        logo: true,
+        taxCode: true,
+        businessLicensePath: true,
+        status: true,
+        reasonReject: true,
+        createdAt: true,
+        updatedAt: true,
+        accountId: true,
+        account: {
+          select: {
+            isLocked: true,
+          },
+        },
+        province: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        _count: {
+          select: {
+            jobs: {
+              where: {
+                isDeleted: false,
+                endDate: {
+                  gte: DATE_SETTINGS.todayStart,
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    const company = {
+      ...companyRaw,
+      jobCount: companyRaw?._count.jobs,
+      _count: undefined,
+    };
+
+    if (!company) {
+      sendResponse(res, {
+        status: 404,
+        success: false,
+        error_code: MESSAGE_CODES.SUCCESS.NOT_FOUND,
+      });
+      return;
+    }
+    sendResponse(res, {
+      status: 200,
+      success: true,
+      data: company,
+      message_code: MESSAGE_CODES.SUCCESS.GET_SUCCESS,
+    });
+  } catch (error) {
+    console.error(error);
+    sendResponse(res, {
+      status: 500,
+      success: false,
+      error_code: MESSAGE_CODES.SEVER.INTERNAL_SERVER_ERROR,
+    });
+  }
+};
+
+export const getJobsCurrentCompanyById = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const page = parseInt(req.query.page as string) || DEFAULT_PAGE;
+    const size = parseInt(req.query.size as string) || DEFAULT_SIZE;
+    const skip = calculationSkip(page, size);
+
+    const id = req.params.id;
+
+    const company = await db.company.findUnique({
+      where: {
+        id: id,
+        status: 1,
+      },
+    });
+
+    if (!company) {
+      sendResponse(res, {
+        status: 404,
+        success: false,
+        error_code: MESSAGE_CODES.SUCCESS.NOT_FOUND,
+      });
+      return;
+    }
+
+    const whereClause = {
+      isDeleted: false,
+      company: {
+        id: id,
+      },
+      endDate: {
+        gte: DATE_SETTINGS.todayStart,
+      },
+    };
+
+    const total = await db.job.count({
+      where: whereClause,
+    });
+
+    const totalPages = calculationTotalPages(total, size);
+
+    const jobs = await db.job.findMany({
+      where: whereClause,
+      skip,
+      take: size,
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        address: true,
+        jobType: true,
+        level: true,
+        numApplications: true,
+        salaryMin: true,
+        salaryMax: true,
+        endDate: true,
+        createdAt: true,
+        updatedAt: true,
+        province: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        company: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        skills: {
+          include: {
+            skill: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
+    if (jobs) {
+      sendListResponse(res, {
+        status: 200,
+        success: true,
+        data: jobs.map((job) => ({
+          ...job,
+          skills: job.skills.map((skill) => ({
+            id: skill.skill.id,
+            name: skill.skill.name,
+          })),
+        })),
         pagination: {
           total,
           page,
