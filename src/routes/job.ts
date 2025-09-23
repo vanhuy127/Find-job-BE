@@ -1,4 +1,4 @@
-import { getJobsForUser } from "./../controllers/job";
+import { getJobByIdForUser, getJobsForUser } from "./../controllers/job";
 import {
   createJob,
   getJobs,
@@ -14,9 +14,13 @@ import express from "express";
 
 const jobRouter = express.Router();
 
+jobRouter.get("/jobs", getJobsForUser);
+
+jobRouter.get("/job/:id", getJobByIdForUser);
+
 jobRouter.get("/admin/jobs", authenticate, authorize(Role.ADMIN), getJobs);
 
-jobRouter.get("/jobs", getJobsForUser);
+jobRouter.get("/admin/job/:id", getJobById);
 
 jobRouter.get(
   "/company/jobs/current-company",
@@ -24,8 +28,6 @@ jobRouter.get(
   authorize(Role.COMPANY),
   getJobsCurrentCompany
 );
-
-jobRouter.get("/admin/job/:id", getJobById);
 
 jobRouter.post(
   "/company/job",

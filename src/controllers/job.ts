@@ -392,6 +392,59 @@ export const getJobsForUser = async (req: Request, res: Response) => {
   }
 };
 
+export const getJobByIdForUser = async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id;
+
+    if (!id) {
+      sendResponse(res, {
+        status: 400,
+        success: false,
+        message_code: MESSAGE_CODES.VALIDATION.ID_REQUIRED,
+      });
+      return;
+    }
+
+    const job = await db.job.findUnique({
+      where: { id, isDeleted: false },
+      include: {
+        province: true,
+        company: true,
+        skills: {
+          include: {
+            skill: true,
+          },
+        },
+      },
+    });
+
+    if (!job) {
+      sendResponse(res, {
+        status: 404,
+        success: false,
+        error_code: MESSAGE_CODES.SUCCESS.NOT_FOUND,
+      });
+      return;
+    }
+
+    sendResponse(res, {
+      status: 200,
+      success: true,
+      data: {
+        ...job,
+        skills: job.skills.map((js) => js.skill),
+      },
+    });
+  } catch (error) {
+    console.error(error);
+    sendResponse(res, {
+      status: 500,
+      success: false,
+      error_code: MESSAGE_CODES.SEVER.INTERNAL_SERVER_ERROR,
+    });
+  }
+};
+
 export const getJobsCurrentCompany = async (req: Request, res: Response) => {
   try {
     const page = parseInt(req.query.page as string) || DEFAULT_PAGE;
