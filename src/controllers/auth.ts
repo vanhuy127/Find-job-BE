@@ -242,7 +242,7 @@ export const changePassword = async (req: Request, res: Response) => {
       return;
     }
 
-    const { newPassword } = parsed.data;
+    const { password, newPassword } = parsed.data;
 
     const { id } = req.user;
 
@@ -262,6 +262,20 @@ export const changePassword = async (req: Request, res: Response) => {
       return;
     }
 
+    const isMatchPassword = await bcrypt.compare(
+      password,
+      existingUser.password
+    );
+
+    if (!isMatchPassword) {
+      sendResponse(res, {
+        status: 400,
+        success: false,
+        error_code: MESSAGE_CODES.AUTH.INVALID_PASSWORD,
+      });
+      return;
+    }
+
     //hash password
     const hashedPassword = await bcrypt.hash(newPassword, 10);
     //update user password
@@ -273,6 +287,7 @@ export const changePassword = async (req: Request, res: Response) => {
         password: hashedPassword,
       },
     });
+
     if (updatedUser) {
       sendResponse(res, {
         status: 200,
@@ -280,6 +295,7 @@ export const changePassword = async (req: Request, res: Response) => {
         data: { email: updatedUser.email },
         message_code: MESSAGE_CODES.SUCCESS.UPDATED_SUCCESS,
       });
+      return;
     }
   } catch (error) {
     console.log(error);
