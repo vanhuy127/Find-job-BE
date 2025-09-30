@@ -5,11 +5,11 @@ import {
   generateAccessToken,
   generateRefreshToken,
   verifyRefreshToken,
-  generateEmailHTML,
   sendResponse,
+  MAIL_OPTIONS,
+  sendEmail,
 } from "@/utils";
 import { addMinutes } from "date-fns";
-import { Resend } from "resend";
 import { MESSAGE_CODES } from "@/constants";
 import {
   changePasswordSchema,
@@ -18,8 +18,6 @@ import {
 } from "@/validations";
 import crypto from "crypto";
 import { Role } from "@prisma/client";
-
-const resend = new Resend(process.env.MAIL_API_KEY);
 
 export const login = async (req: Request, res: Response) => {
   try {
@@ -410,7 +408,7 @@ export const unlockAccount = async (req: Request, res: Response) => {
   }
 };
 
-export const forgotPassword = async (req: Request, res: Response) => {
+export const sendEmailForgotPassword = async (req: Request, res: Response) => {
   try {
     const parsed = forgotPasswordSchema.safeParse(req.body);
 
@@ -429,7 +427,7 @@ export const forgotPassword = async (req: Request, res: Response) => {
 
     const { email } = parsed.data;
 
-    const user = await db.user.findUnique({
+    const user = await db.account.findFirst({
       where: { email },
     });
 
@@ -445,44 +443,77 @@ export const forgotPassword = async (req: Request, res: Response) => {
     const resetToken = crypto.randomBytes(32).toString("hex");
     const resetExpires = addMinutes(new Date(), 30);
 
+    const resetLink = `${process.env.FRONT_END_URL}/reset-password/${resetToken}`;
+    await sendEmail(
+      user.email,
+      "Password Reset Request",
+      MAIL_OPTIONS.FORGOT_PASSWORD(resetLink, resetExpires.toLocaleString())
+    );
+
     await db.account.update({
-      where: { id: user.accountId! },
+      where: { id: user.id },
       data: {
         resetToken,
         resetExpires,
       },
     });
 
-    const resetLink = `${process.env.FRONT_END_URL}/${resetToken}`;
-    const name = user.fullName;
-    const emailHTML = generateEmailHTML({
-      name,
-      resetLink,
+    sendResponse(res, {
+      status: 200,
+      success: true,
+      message_code: MESSAGE_CODES.SUCCESS.PASSWORD_RESET_EMAIL_SENT,
+      data: { email, resetToken },
     });
-    const { data, error } = await resend.emails.send({
-      from: process.env.MY_EMAIL || "",
-      to: email,
-      subject: "Password Reset Request",
-      html: emailHTML,
+  } catch (error) {
+    console.error("Error during forgot password:", error);
+    sendResponse(res, {
+      status: 500,
+      success: false,
+      error_code: MESSAGE_CODES.SEVER.INTERNAL_SERVER_ERROR,
     });
+  }
+};
 
-    if (error) {
-      console.error(error);
+export const checkTokenAvailable = async (req: Request, res: Response) => {
+  try {
+    const token = req.params.token;
+
+    if (!token) {
       sendResponse(res, {
         status: 400,
         success: false,
-        error_code: MESSAGE_CODES.FAIL.EMAIL_SEND_FAILED,
-        errors: [{ field: "email", error_code: "Email send fail" }],
+        message_code: MESSAGE_CODES.VALIDATION.ID_REQUIRED,
       });
+      return;
+    }
 
+    const user = await db.account.findFirst({
+      where: { resetToken: token },
+    });
+
+    if (!user) {
+      sendResponse(res, {
+        status: 404,
+        success: false,
+        error_code: MESSAGE_CODES.SUCCESS.NOT_FOUND,
+      });
+      return;
+    }
+
+    if (user.resetExpires && user.resetExpires < new Date()) {
+      sendResponse(res, {
+        status: 410,
+        success: false,
+        error_code: MESSAGE_CODES.AUTH.INVALID_OR_EXPIRED_TOKEN,
+      });
       return;
     }
 
     sendResponse(res, {
       status: 200,
       success: true,
-      message_code: MESSAGE_CODES.SUCCESS.PASSWORD_RESET_EMAIL_SENT,
-      data: { email, resetToken },
+      message_code: MESSAGE_CODES.SUCCESS.GET_SUCCESS,
+      data: { email: user.email },
     });
   } catch (error) {
     console.error("Error during forgot password:", error);

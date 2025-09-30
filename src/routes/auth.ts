@@ -5,10 +5,11 @@ import {
   changePassword,
   lockAccount,
   unlockAccount,
-  forgotPassword,
-  resetPassword,
   createAdminAccount,
   getMe,
+  sendEmailForgotPassword,
+  checkTokenAvailable,
+  resetPassword,
 } from "@/controllers/auth";
 import { authenticate } from "@/middlewares/authenticate";
 import { authorize } from "@/middlewares/authorize";
@@ -27,6 +28,12 @@ authRouter.get("/auth/me", authenticate, getMe);
 
 authRouter.patch("/auth/change-password", authenticate, changePassword);
 
+authRouter.patch("/auth/forgot-password", sendEmailForgotPassword);
+
+authRouter.get("/auth/forgot-password/:token", checkTokenAvailable);
+
+authRouter.patch("/auth/reset-password", resetPassword);
+
 authRouter.patch(
   "/auth/lock-account",
   authenticate,
@@ -40,10 +47,6 @@ authRouter.patch(
   authorize(Role.ADMIN),
   unlockAccount
 );
-
-authRouter.post("/auth/forgot-password", forgotPassword);
-
-authRouter.patch("/auth/reset-password", resetPassword);
 
 authRouter.post("/auth/create-admin", createAdminAccount);
 
