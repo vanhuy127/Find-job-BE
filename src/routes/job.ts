@@ -1,4 +1,8 @@
-import { getJobByIdForUser, getJobsForUser } from "./../controllers/job";
+import {
+  getCurrentResumesById,
+  getJobByIdForUser,
+  getJobsForUser,
+} from "./../controllers/job";
 import {
   createJob,
   getJobs,
@@ -15,6 +19,13 @@ import express from "express";
 const jobRouter = express.Router();
 
 jobRouter.get("/jobs", getJobsForUser);
+
+jobRouter.get(
+  "/job/:id/current-resumes",
+  authenticate,
+  authorize(Role.USER),
+  getCurrentResumesById
+);
 
 jobRouter.get("/job/:id", getJobByIdForUser);
 

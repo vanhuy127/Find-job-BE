@@ -7,6 +7,8 @@ import {
   calculationTotalPages,
 } from "@/utils";
 import { DEFAULT_PAGE, DEFAULT_SIZE, MESSAGE_CODES } from "@/constants";
+import { uploadResumeSchema } from "@/validations";
+import { v2 as cloudinary } from "cloudinary";
 
 export const getResumes = async (req: Request, res: Response) => {
   try {
@@ -269,5 +271,89 @@ export const changeStatus = async (req: Request, res: Response) => {
       success: false,
       error_code: MESSAGE_CODES.SEVER.INTERNAL_SERVER_ERROR,
     });
+  }
+};
+
+export const uploadResume = async (req: Request, res: Response) => {
+  let uploadedPublicId;
+  try {
+    const fileData = req.file;
+    const { jobId, coverLetter } = req.body;
+
+    const userId = req.user.id;
+    if (!fileData) {
+      sendResponse(res, {
+        status: 400,
+        success: false,
+        error_code: MESSAGE_CODES.VALIDATION.FILE_REQUIRED,
+      });
+      return;
+    }
+
+    const parsed = uploadResumeSchema.safeParse({
+      ...req.body,
+      file: fileData,
+    });
+
+    if (!parsed.success) {
+      if (fileData && uploadedPublicId)
+        await cloudinary.uploader.destroy(uploadedPublicId);
+
+      sendResponse(res, {
+        status: 400,
+        success: false,
+        error_code: MESSAGE_CODES.VALIDATION.VALIDATION_ERROR,
+        errors: parsed.error.errors.map((err) => ({
+          field: err.path.join("."),
+          error_code: err.message,
+        })),
+      });
+      return;
+    }
+
+    uploadedPublicId = fileData.filename;
+
+    const [user, job] = await Promise.all([
+      db.user.findUnique({ where: { accountId: userId } }),
+      db.job.findUnique({ where: { id: jobId } }),
+    ]);
+
+    if (!user || !job) {
+      if (fileData && uploadedPublicId)
+        await cloudinary.uploader.destroy(uploadedPublicId);
+
+      sendResponse(res, {
+        status: 404,
+        success: false,
+        error_code: MESSAGE_CODES.SUCCESS.NOT_FOUND,
+      });
+      return;
+    }
+
+    const application = await db.application.create({
+      data: {
+        userId: user.id,
+        jobId,
+        coverLetter: coverLetter || null,
+        resumePath: fileData.filename,
+      },
+    });
+
+    sendResponse(res, {
+      status: 200,
+      success: true,
+      message_code: MESSAGE_CODES.SUCCESS.CREATED_SUCCESS,
+      data: application,
+    });
+  } catch (error) {
+    console.error(error);
+    if (uploadedPublicId) await cloudinary.uploader.destroy(uploadedPublicId);
+
+    sendResponse(res, {
+      status: 500,
+      success: false,
+      error_code: MESSAGE_CODES.SEVER.INTERNAL_SERVER_ERROR,
+    });
+    return;
   }
 };

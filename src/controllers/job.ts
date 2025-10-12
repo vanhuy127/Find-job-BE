@@ -8,7 +8,7 @@ import {
   calculationTotalPages,
   DATE_SETTINGS,
 } from "@/utils";
-import { isValid, min } from "date-fns";
+import { isValid } from "date-fns";
 import { DATE_FORMAT } from "@/constants/date";
 import { DEFAULT_PAGE, DEFAULT_SIZE, MESSAGE_CODES } from "@/constants";
 import { jobSchema } from "@/validations";
@@ -383,6 +383,45 @@ export const getJobsForUser = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error(error);
+    sendResponse(res, {
+      status: 500,
+      success: false,
+      error_code: MESSAGE_CODES.SEVER.INTERNAL_SERVER_ERROR,
+    });
+    return;
+  }
+};
+
+export const getCurrentResumesById = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user.id;
+    const jobId = req.params.id;
+
+    const user = await db.user.findUnique({ where: { accountId: userId } });
+    if (!user) {
+      sendResponse(res, {
+        status: 404,
+        success: false,
+        error_code: MESSAGE_CODES.SUCCESS.NOT_FOUND,
+      });
+      return;
+    }
+    const applications = await db.application.findMany({
+      where: { userId: user.id, jobId },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+    sendListResponse(res, {
+      status: 200,
+      success: true,
+      data: applications,
+      message_code: MESSAGE_CODES.SUCCESS.GET_ALL_SUCCESS,
+    });
+    return;
+  } catch (error) {
+    console.error(error);
+
     sendResponse(res, {
       status: 500,
       success: false,
