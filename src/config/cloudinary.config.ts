@@ -8,12 +8,23 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_SECRET,
 });
 
-const storage = new CloudinaryStorage({
+const fileStorage = new CloudinaryStorage({
   cloudinary,
-  allowedFormats: ["jpg", "png", "pdf"],
-  params: {
+  params: async (req: any, file: any) => ({
     folder: "uploads",
-  },
+    resource_type: "raw",
+    public_id: `${Date.now()}-${file.originalname}`,
+  }),
 });
 
-export const uploadCloud = multer({ storage });
+const imageStorage = new CloudinaryStorage({
+  cloudinary,
+  params: async (req: any, file: any) => ({
+    folder: "images",
+    resource_type: "images",
+    public_id: `${Date.now()}-${file.originalname}`,
+  }),
+});
+
+export const uploadFileCloud = multer({ storage: fileStorage });
+export const uploadImageCloud = multer({ storage: imageStorage });

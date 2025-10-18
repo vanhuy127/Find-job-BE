@@ -4,7 +4,7 @@ const ACCESS_TOKEN_KEY = process.env.ACCESS_TOKEN_KEY;
 const REFRESH_TOKEN_KEY = process.env.REFRESH_TOKEN_KEY;
 
 export function generateAccessToken(payload: JwtPayload) {
-  return jwt.sign(payload, ACCESS_TOKEN_KEY!, { expiresIn: "15m" });
+  return jwt.sign(payload, ACCESS_TOKEN_KEY!, { expiresIn: "1d" });
 }
 
 export function verifyAccessToken(token: string): {

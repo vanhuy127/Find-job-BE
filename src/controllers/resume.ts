@@ -9,6 +9,7 @@ import {
 import { DEFAULT_PAGE, DEFAULT_SIZE, MESSAGE_CODES } from "@/constants";
 import { uploadResumeSchema } from "@/validations";
 import { v2 as cloudinary } from "cloudinary";
+import { ApplicationStatus } from "@prisma/client";
 
 export const getResumes = async (req: Request, res: Response) => {
   try {
@@ -279,6 +280,7 @@ export const uploadResume = async (req: Request, res: Response) => {
   try {
     const fileData = req.file;
     const { jobId, coverLetter } = req.body;
+    console.log(fileData);
 
     const userId = req.user.id;
     if (!fileData) {
@@ -335,7 +337,7 @@ export const uploadResume = async (req: Request, res: Response) => {
         userId: user.id,
         jobId,
         coverLetter: coverLetter || null,
-        resumePath: fileData.filename,
+        resumePath: fileData.path,
       },
     });
 
@@ -348,6 +350,167 @@ export const uploadResume = async (req: Request, res: Response) => {
   } catch (error) {
     console.error(error);
     if (uploadedPublicId) await cloudinary.uploader.destroy(uploadedPublicId);
+
+    sendResponse(res, {
+      status: 500,
+      success: false,
+      error_code: MESSAGE_CODES.SEVER.INTERNAL_SERVER_ERROR,
+    });
+    return;
+  }
+};
+
+export const getResumesForUser = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user.id;
+
+    const user = await db.user.findUnique({ where: { accountId: userId } });
+    if (!user) {
+      sendResponse(res, {
+        status: 404,
+        success: false,
+        error_code: MESSAGE_CODES.SUCCESS.NOT_FOUND,
+      });
+      return;
+    }
+
+    const page = parseInt(req.query.page as string) || DEFAULT_PAGE;
+    const size = parseInt(req.query.size as string) || DEFAULT_SIZE;
+    const skip = calculationSkip(page, size);
+    const search = (req.query.search as string)?.trim().toLowerCase() || "";
+    const status = (req.query.status as string)?.trim().toLowerCase() || "";
+
+    const statusValue = Object.values(ApplicationStatus).includes(
+      status.toUpperCase() as ApplicationStatus
+    )
+      ? (status.toUpperCase() as ApplicationStatus)
+      : undefined;
+
+    const whereClause: any = {
+      userId: user.id,
+      job: {
+        isDeleted: false,
+      },
+      ...(status && {
+        status: { equals: statusValue },
+      }),
+      ...(search && {
+        OR: [
+          {
+            job: {
+              title: {
+                contains: search,
+              },
+            },
+          },
+          {
+            job: {
+              company: {
+                name: {
+                  contains: search,
+                },
+              },
+            },
+          },
+        ],
+      }),
+    };
+
+    const total = await db.application.count({
+      where: whereClause,
+    });
+    const totalPages = calculationTotalPages(total, size);
+
+    const applications = await db.application.findMany({
+      where: whereClause,
+      skip,
+      take: size,
+      include: {
+        job: {
+          include: {
+            company: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+    sendListResponse(res, {
+      status: 200,
+      success: true,
+      data: applications,
+      pagination: {
+        total,
+        page,
+        size,
+        totalPages,
+      },
+      message_code: MESSAGE_CODES.SUCCESS.GET_ALL_SUCCESS,
+    });
+    return;
+  } catch (error) {
+    console.error(error);
+
+    sendResponse(res, {
+      status: 500,
+      success: false,
+      error_code: MESSAGE_CODES.SEVER.INTERNAL_SERVER_ERROR,
+    });
+    return;
+  }
+};
+
+export const getResumeByIdForUser = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user.id;
+
+    const user = await db.user.findUnique({ where: { accountId: userId } });
+    if (!user) {
+      sendResponse(res, {
+        status: 404,
+        success: false,
+        error_code: MESSAGE_CODES.SUCCESS.NOT_FOUND,
+      });
+      return;
+    }
+
+    const id = req.params.id;
+
+    if (!id) {
+      sendResponse(res, {
+        status: 400,
+        success: false,
+        message_code: MESSAGE_CODES.VALIDATION.ID_REQUIRED,
+      });
+      return;
+    }
+
+    const application = await db.application.findFirst({
+      where: {
+        id: id,
+        userId: user.id,
+        job: {
+          isDeleted: false,
+        },
+      },
+      include: {
+        job: {
+          include: {
+            company: true,
+          },
+        },
+      },
+    });
+    sendResponse(res, {
+      status: 200,
+      success: true,
+      data: application,
+      message_code: MESSAGE_CODES.SUCCESS.GET_SUCCESS,
+    });
+    return;
+  } catch (error) {
+    console.error(error);
 
     sendResponse(res, {
       status: 500,

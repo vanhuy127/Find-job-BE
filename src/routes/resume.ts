@@ -1,8 +1,10 @@
-import { uploadCloud } from "@/config/cloudinary.config";
+import { uploadFileCloud } from "@/config/cloudinary.config";
 import {
   changeStatus,
   getResumeById,
+  getResumeByIdForUser,
   getResumes,
+  getResumesForUser,
   uploadResume,
 } from "@/controllers/resume";
 import { authenticate } from "@/middlewares/authenticate";
@@ -13,6 +15,20 @@ import express from "express";
 const resumeRouter = express.Router();
 
 resumeRouter.get("/resumes", authenticate, authorize(Role.COMPANY), getResumes);
+
+resumeRouter.get(
+  "/resumes/current-user",
+  authenticate,
+  authorize(Role.USER),
+  getResumesForUser
+);
+
+resumeRouter.get(
+  "/resume/:id/current-user",
+  authenticate,
+  authorize(Role.USER),
+  getResumeByIdForUser
+);
 
 resumeRouter.get(
   "/resume/:id",
@@ -32,7 +48,7 @@ resumeRouter.post(
   "/upload-resume",
   authenticate,
   authorize(Role.USER),
-  uploadCloud.single("file"),
+  uploadFileCloud.single("file"),
   uploadResume
 );
 
