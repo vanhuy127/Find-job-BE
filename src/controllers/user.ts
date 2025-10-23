@@ -29,7 +29,7 @@ export const createUser = async (req: Request, res: Response) => {
       return;
     }
 
-    const { email, password, username, fullName, dob, phone, address, gender } =
+    const { email, password, fullName, dob, phone, address, gender } =
       parsed.data;
 
     const existingEmail = await db.account.findFirst({
@@ -88,7 +88,6 @@ export const createUser = async (req: Request, res: Response) => {
     const user = await db.user.create({
       data: {
         email,
-        username,
         fullName,
         phone,
         address,
@@ -138,7 +137,6 @@ export const getUsers = async (req: Request, res: Response) => {
       ...(search && {
         OR: [
           { email: { contains: search } },
-          { username: { contains: search } },
           { fullName: { contains: search } },
         ],
       }),
@@ -159,7 +157,6 @@ export const getUsers = async (req: Request, res: Response) => {
       select: {
         id: true,
         email: true,
-        username: true,
         fullName: true,
         phone: true,
         dob: true,
@@ -280,7 +277,7 @@ export const updateUser = async (req: Request, res: Response) => {
       return;
     }
 
-    const { username, fullName, phone, dob, gender, address } = parsed.data;
+    const { fullName, phone, dob, gender, address } = parsed.data;
 
     //check if user exists
     const existingUser = await db.user.findUnique({
@@ -335,7 +332,6 @@ export const updateUser = async (req: Request, res: Response) => {
         id,
       },
       data: {
-        username,
         fullName,
         phone,
         dob: parsedDob,

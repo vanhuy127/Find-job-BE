@@ -19,10 +19,6 @@ export const createUserSchema = z.object({
       message:
         "Password must include uppercase, lowercase, a number, and a special character.",
     }),
-  username: z
-    .string()
-    .min(3, { message: "Username must be at least 3 characters long." })
-    .max(30, { message: "Username cannot exceed 30 characters." }),
   fullName: z
     .string()
     .min(3, { message: "Full name must be at least 3 characters long." })
@@ -45,10 +41,6 @@ export const createUserSchema = z.object({
 });
 
 export const updateUserSchema = z.object({
-  username: z
-    .string()
-    .min(3, { message: "Username must be at least 3 characters long." })
-    .max(30, { message: "Username cannot exceed 30 characters." }),
   fullName: z
     .string()
     .min(3, { message: "Full name must be at least 3 characters long." })

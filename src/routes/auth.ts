@@ -10,6 +10,7 @@ import {
   sendEmailForgotPassword,
   checkTokenAvailable,
   resetPassword,
+  register,
 } from "@/controllers/auth";
 import { authenticate } from "@/middlewares/authenticate";
 import { authorize } from "@/middlewares/authorize";
@@ -17,6 +18,8 @@ import { Role } from "@prisma/client";
 import express from "express";
 
 const authRouter = express.Router();
+
+authRouter.post("/auth/register", register);
 
 authRouter.post("/auth/login", login);
 

@@ -8,16 +8,95 @@ import {
   sendResponse,
   MAIL_OPTIONS,
   sendEmail,
+  parseDate,
 } from "@/utils";
-import { addMinutes } from "date-fns";
-import { MESSAGE_CODES } from "@/constants";
+import { addMinutes, isValid } from "date-fns";
+import { DATE_FORMAT, MESSAGE_CODES } from "@/constants";
 import {
   changePasswordSchema,
   forgotPasswordSchema,
   loginSchema,
+  registerSchema,
 } from "@/validations";
 import crypto from "crypto";
-import { Role } from "@prisma/client";
+import { Gender, Role } from "@prisma/client";
+
+export const register = async (req: Request, res: Response) => {
+  try {
+    const parsed = registerSchema.safeParse(req.body);
+    if (!parsed.success) {
+      sendResponse(res, {
+        status: 400,
+        success: false,
+        error_code: MESSAGE_CODES.VALIDATION.VALIDATION_ERROR,
+        errors: parsed.error.errors.map((err) => ({
+          field: err.path.join("."),
+          error_code: err.message,
+        })),
+      });
+      return;
+    }
+
+    const { email, password, fullName, dob, phone, address, gender } =
+      parsed.data;
+
+    const existingAccount = await db.account.findFirst({
+      where: { email: email.trim() },
+    });
+
+    if (existingAccount) {
+      sendResponse(res, {
+        status: 409,
+        success: false,
+        error_code: MESSAGE_CODES.VALIDATION.EMAIL_ALREADY_EXISTS,
+      });
+      return;
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    let parsedDob = parseDate(dob, DATE_FORMAT);
+    if (!isValid(parsedDob)) {
+      sendResponse(res, {
+        status: 400,
+        success: false,
+        error_code: MESSAGE_CODES.VALIDATION.INVALID_DATE_FORMAT,
+      });
+    }
+
+    const newUser = await db.user.create({
+      data: {
+        email: email.trim(),
+        fullName: fullName.trim(),
+        phone: phone,
+        dob: parsedDob,
+        address: address,
+        gender: gender as Gender,
+        account: {
+          create: {
+            email: email.trim(),
+            password: hashedPassword,
+          },
+        },
+      },
+    });
+
+    sendResponse(res, {
+      status: 200,
+      success: true,
+      data: newUser,
+      message_code: MESSAGE_CODES.SUCCESS.REGISTER_SUCCESS,
+    });
+  } catch (error) {
+    console.error("Error during register user:", error);
+    sendResponse(res, {
+      status: 500,
+      success: false,
+      error_code: MESSAGE_CODES.SEVER.INTERNAL_SERVER_ERROR,
+    });
+    return;
+  }
+};
 
 export const login = async (req: Request, res: Response) => {
   try {
