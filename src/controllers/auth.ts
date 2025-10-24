@@ -14,12 +14,14 @@ import { addMinutes, isValid } from "date-fns";
 import { DATE_FORMAT, MESSAGE_CODES } from "@/constants";
 import {
   changePasswordSchema,
+  createCompanySchema,
   forgotPasswordSchema,
   loginSchema,
   registerSchema,
 } from "@/validations";
 import crypto from "crypto";
 import { Gender, Role } from "@prisma/client";
+import { v2 as cloudinary } from "cloudinary";
 
 export const register = async (req: Request, res: Response) => {
   try {
@@ -95,6 +97,127 @@ export const register = async (req: Request, res: Response) => {
       error_code: MESSAGE_CODES.SEVER.INTERNAL_SERVER_ERROR,
     });
     return;
+  }
+};
+
+export const registerCompany = async (req: Request, res: Response) => {
+  let uploadedLogoPublicId: string | undefined;
+  let uploadedLicensePublicId: string | undefined;
+
+  try {
+    const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+
+    const logoFile = files?.["logo"]?.[0];
+    const businessLicenseFile = files?.["businessLicensePath"]?.[0];
+
+    console.log(logoFile, businessLicenseFile);
+
+    if (!logoFile || !businessLicenseFile) {
+      sendResponse(res, {
+        status: 400,
+        success: false,
+        error_code: MESSAGE_CODES.VALIDATION.FILE_REQUIRED,
+      });
+      return;
+    }
+
+    uploadedLogoPublicId = logoFile.filename;
+    uploadedLicensePublicId = businessLicenseFile.filename;
+
+    const parsed = createCompanySchema.safeParse({
+      ...req.body,
+      logo: logoFile,
+      businessLicensePath: businessLicenseFile,
+    });
+
+    if (!parsed.success) {
+      if (uploadedLogoPublicId)
+        await cloudinary.uploader.destroy(uploadedLogoPublicId);
+      if (uploadedLicensePublicId)
+        await cloudinary.uploader.destroy(uploadedLicensePublicId);
+
+      sendResponse(res, {
+        status: 400,
+        success: false,
+        error_code: MESSAGE_CODES.VALIDATION.VALIDATION_ERROR,
+        errors: parsed.error.errors.map((err) => ({
+          field: err.path.join("."),
+          error_code: err.message,
+        })),
+      });
+      return;
+    }
+
+    const {
+      email,
+      password,
+      name,
+      description,
+      address,
+      provinceId,
+      website,
+      taxCode,
+    } = parsed.data;
+
+    const existing = await db.account.findFirst({ where: { email } });
+    if (existing) {
+      await Promise.all([
+        uploadedLogoPublicId &&
+          cloudinary.uploader.destroy(uploadedLogoPublicId),
+        uploadedLicensePublicId &&
+          cloudinary.uploader.destroy(uploadedLicensePublicId),
+      ]);
+      sendResponse(res, {
+        status: 400,
+        success: false,
+        error_code: MESSAGE_CODES.VALIDATION.EMAIL_ALREADY_EXISTS,
+      });
+      return;
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const account = await db.account.create({
+      data: {
+        email,
+        password: hashedPassword,
+        role: Role.COMPANY,
+      },
+    });
+
+    const company = await db.company.create({
+      data: {
+        email,
+        name,
+        description,
+        address,
+        provinceId,
+        website,
+        taxCode,
+        businessLicensePath: businessLicenseFile.path,
+        logo: logoFile.path,
+        accountId: account.id,
+      },
+    });
+
+    sendResponse(res, {
+      status: 201,
+      success: true,
+      data: company,
+      message_code: MESSAGE_CODES.SUCCESS.REGISTER_SUCCESS,
+    });
+  } catch (error) {
+    console.error(error);
+    await Promise.all([
+      uploadedLogoPublicId && cloudinary.uploader.destroy(uploadedLogoPublicId),
+      uploadedLicensePublicId &&
+        cloudinary.uploader.destroy(uploadedLicensePublicId),
+    ]);
+
+    sendResponse(res, {
+      status: 500,
+      success: false,
+      error_code: MESSAGE_CODES.SEVER.INTERNAL_SERVER_ERROR,
+    });
   }
 };
 

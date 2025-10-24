@@ -278,9 +278,9 @@ export const changeStatus = async (req: Request, res: Response) => {
 export const uploadResume = async (req: Request, res: Response) => {
   let uploadedPublicId;
   try {
-    const fileData = req.file;
+    const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+    const fileData = files?.["file"]?.[0];
     const { jobId, coverLetter } = req.body;
-    console.log(fileData);
 
     const userId = req.user.id;
     if (!fileData) {
@@ -291,6 +291,8 @@ export const uploadResume = async (req: Request, res: Response) => {
       });
       return;
     }
+
+    uploadedPublicId = fileData.filename;
 
     const parsed = uploadResumeSchema.safeParse({
       ...req.body,
@@ -312,8 +314,6 @@ export const uploadResume = async (req: Request, res: Response) => {
       });
       return;
     }
-
-    uploadedPublicId = fileData.filename;
 
     const [user, job] = await Promise.all([
       db.user.findUnique({ where: { accountId: userId } }),

@@ -1,6 +1,5 @@
 import db from "@/config/db";
 import { Request, Response } from "express";
-import bcrypt from "bcrypt";
 import {
   sendListResponse,
   sendResponse,
@@ -9,90 +8,7 @@ import {
   DATE_SETTINGS,
 } from "@/utils";
 import { MESSAGE_CODES, DEFAULT_PAGE, DEFAULT_SIZE } from "@/constants";
-import {
-  createCompanySchema,
-  updateCompanySchema,
-} from "@/validations/company";
-import { Role } from "@prisma/client";
-
-export const createCompany = async (req: Request, res: Response) => {
-  try {
-    const parsed = createCompanySchema.safeParse(req.body);
-    if (!parsed.success) {
-      sendResponse(res, {
-        status: 400,
-        success: false,
-        error_code: MESSAGE_CODES.VALIDATION.VALIDATION_ERROR,
-        errors: parsed.error.errors.map((err) => ({
-          field: err.path.join("."),
-          error_code: err.message,
-        })),
-      });
-      return;
-    }
-
-    const {
-      email,
-      password,
-      name,
-      description,
-      address,
-      provinceId,
-      website,
-      taxCode,
-      businessLicensePath,
-      logo,
-    } = parsed.data;
-
-    const existing = await db.account.findFirst({ where: { email } });
-    if (existing) {
-      sendResponse(res, {
-        status: 400,
-        success: false,
-        error_code: MESSAGE_CODES.VALIDATION.EMAIL_ALREADY_EXISTS,
-      });
-      return;
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const account = await db.account.create({
-      data: {
-        email,
-        password: hashedPassword,
-        role: Role.COMPANY,
-      },
-    });
-
-    const company = await db.company.create({
-      data: {
-        email,
-        name,
-        description,
-        address,
-        provinceId,
-        website,
-        taxCode,
-        businessLicensePath,
-        logo,
-        accountId: account.id,
-      },
-    });
-
-    sendResponse(res, {
-      status: 201,
-      success: true,
-      data: company,
-      message_code: MESSAGE_CODES.SUCCESS.CREATED_SUCCESS,
-    });
-  } catch (error) {
-    console.error(error);
-    sendResponse(res, {
-      status: 500,
-      success: false,
-      error_code: MESSAGE_CODES.SEVER.INTERNAL_SERVER_ERROR,
-    });
-  }
-};
+import { updateCompanySchema } from "@/validations/company";
 
 export const getCompanies = async (req: Request, res: Response) => {
   try {

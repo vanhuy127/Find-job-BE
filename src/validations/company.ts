@@ -1,5 +1,6 @@
 import { PASSWORD_REGEX } from "@/constants";
 import { z } from "zod";
+import { fileSchema } from "./file";
 
 export const createCompanySchema = z.object({
   email: z
@@ -30,10 +31,8 @@ export const createCompanySchema = z.object({
   taxCode: z
     .string()
     .min(5, { message: "Tax code must be at least 5 characters long." }),
-  businessLicensePath: z
-    .string()
-    .min(3, { message: "Please provide a valid business license path." }),
-  logo: z.string().min(3, { message: "Please upload a company logo." }),
+  businessLicensePath: fileSchema,
+  logo: fileSchema,
 });
 
 export const updateCompanySchema = z.object({

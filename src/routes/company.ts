@@ -1,5 +1,4 @@
 import {
-  createCompany,
   getCompanies,
   getCompanyById,
   updateCompany,
@@ -17,8 +16,6 @@ import { Role } from "@prisma/client";
 import express from "express";
 
 const companyRouter = express.Router();
-
-companyRouter.post("/company", createCompany);
 
 companyRouter.get(
   "/admin/companies",

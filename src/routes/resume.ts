@@ -1,4 +1,4 @@
-import { uploadFileCloud } from "@/config/cloudinary.config";
+import { uploadMixedCloud } from "@/config/cloudinary.config";
 import {
   changeStatus,
   getResumeById,
@@ -48,7 +48,7 @@ resumeRouter.post(
   "/upload-resume",
   authenticate,
   authorize(Role.USER),
-  uploadFileCloud.single("file"),
+  uploadMixedCloud.fields([{ name: "file", maxCount: 1 }]),
   uploadResume
 );
 

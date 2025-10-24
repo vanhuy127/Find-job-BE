@@ -1,3 +1,4 @@
+import { uploadMixedCloud } from "@/config/cloudinary.config";
 import {
   login,
   logout,
@@ -11,6 +12,7 @@ import {
   checkTokenAvailable,
   resetPassword,
   register,
+  registerCompany,
 } from "@/controllers/auth";
 import { authenticate } from "@/middlewares/authenticate";
 import { authorize } from "@/middlewares/authorize";
@@ -20,6 +22,15 @@ import express from "express";
 const authRouter = express.Router();
 
 authRouter.post("/auth/register", register);
+
+authRouter.post(
+  "/auth/register-company",
+  uploadMixedCloud.fields([
+    { name: "logo", maxCount: 1 },
+    { name: "businessLicensePath", maxCount: 1 },
+  ]),
+  registerCompany
+);
 
 authRouter.post("/auth/login", login);
 
