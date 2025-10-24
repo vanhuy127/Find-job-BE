@@ -8,6 +8,7 @@ import {
   getCompaniesForUser,
   getCompanyByIdForUser,
   getJobsCurrentCompanyById,
+  getAccountCompanyStatus,
 } from "@/controllers/company";
 
 import { authenticate } from "@/middlewares/authenticate";
@@ -23,6 +24,8 @@ companyRouter.get(
   authorize(Role.ADMIN),
   getCompanies
 );
+
+companyRouter.get("/company/verification-status", getAccountCompanyStatus);
 
 companyRouter.get("/companies", getCompaniesForUser);
 

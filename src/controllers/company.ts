@@ -805,3 +805,51 @@ export const changeStatusCompany = async (req: Request, res: Response) => {
     });
   }
 };
+
+export const getAccountCompanyStatus = async (req: Request, res: Response) => {
+  try {
+    const email =
+      typeof req.query.email === "string" ? req.query.email : undefined;
+
+    if (!email) {
+      sendResponse(res, {
+        status: 400,
+        success: false,
+        message_code: MESSAGE_CODES.VALIDATION.EMAIL_REQUIRED,
+      });
+      return;
+    }
+
+    const companyExisting = await db.company.findUnique({
+      where: {
+        email,
+      },
+      include: {
+        province: true,
+      },
+    });
+
+    if (!companyExisting) {
+      sendResponse(res, {
+        status: 404,
+        success: false,
+        error_code: MESSAGE_CODES.SUCCESS.NOT_FOUND,
+      });
+      return;
+    }
+
+    sendResponse(res, {
+      status: 200,
+      success: true,
+      data: companyExisting,
+      message_code: MESSAGE_CODES.SUCCESS.GET_SUCCESS,
+    });
+  } catch (error) {
+    console.error(error);
+    sendResponse(res, {
+      status: 500,
+      success: false,
+      error_code: MESSAGE_CODES.SEVER.INTERNAL_SERVER_ERROR,
+    });
+  }
+};
