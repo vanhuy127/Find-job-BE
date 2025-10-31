@@ -1,6 +1,5 @@
 import cookieParser from "cookie-parser";
 import express from "express";
-import { rateLimit } from "express-rate-limit";
 import userRouter from "@/routes/user";
 import authRouter from "@/routes/auth";
 import companyRouter from "./routes/company";
@@ -8,6 +7,7 @@ import provinceRouter from "./routes/province";
 import jobRouter from "./routes/job";
 import skillRouter from "./routes/skill";
 import resumeRouter from "./routes/resume";
+import statRouter from "./routes/statistics";
 
 require("dotenv").config();
 
@@ -43,6 +43,7 @@ app.use("/api/v1", provinceRouter);
 app.use("/api/v1", jobRouter);
 app.use("/api/v1", skillRouter);
 app.use("/api/v1", resumeRouter);
+app.use("/api/v1", statRouter);
 
 // const rateLimitErrorHandler: express.ErrorRequestHandler = (
 //   err,

@@ -521,7 +521,6 @@ export const getCompanyPendingById = async (req: Request, res: Response) => {
     const company = await db.company.findUnique({
       where: {
         id: id,
-        status: { in: [-1, 0] }, // -1 for pending, 0 for rejected
       },
       select: {
         id: true,
