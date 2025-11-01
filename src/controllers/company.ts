@@ -9,6 +9,7 @@ import {
 } from "@/utils";
 import { MESSAGE_CODES, DEFAULT_PAGE, DEFAULT_SIZE } from "@/constants";
 import { updateCompanySchema } from "@/validations/company";
+import { v2 as cloudinary } from "cloudinary";
 
 export const getCompanies = async (req: Request, res: Response) => {
   try {
@@ -575,21 +576,40 @@ export const getCompanyPendingById = async (req: Request, res: Response) => {
   }
 };
 
-export const updateCompany = async (req: Request, res: Response) => {
+export const updateCompanyInfo = async (req: Request, res: Response) => {
+  let uploadedLogoPublicId: string | undefined;
   try {
-    const id = req.params.id;
+    const files = req.files as { [fieldname: string]: Express.Multer.File[] };
 
-    if (!id) {
+    const logoFile = files?.["logo"]?.[0];
+    const companyId = req.user?.id;
+
+    const company = await db.company.findUnique({
+      where: {
+        accountId: companyId,
+        status: 1,
+      },
+    });
+
+    if (!company) {
       sendResponse(res, {
-        status: 400,
+        status: 404,
         success: false,
-        message_code: MESSAGE_CODES.VALIDATION.ID_REQUIRED,
+        error_code: MESSAGE_CODES.SUCCESS.NOT_FOUND,
       });
       return;
     }
 
-    const parsed = updateCompanySchema.safeParse(req.body);
+    uploadedLogoPublicId = logoFile && logoFile.filename;
+
+    const parsed = updateCompanySchema.safeParse({
+      ...req.body,
+      logo: logoFile || company.logo,
+    });
     if (!parsed.success) {
+      if (uploadedLogoPublicId)
+        await cloudinary.uploader.destroy(uploadedLogoPublicId);
+
       sendResponse(res, {
         status: 400,
         success: false,
@@ -602,34 +622,18 @@ export const updateCompany = async (req: Request, res: Response) => {
       return;
     }
 
-    const { description, address, provinceId, website, logo } = parsed.data;
-
-    //check if company exists
-    const existingCompany = await db.company.findUnique({
-      where: {
-        id,
-        status: 1,
-      },
-    });
-    if (!existingCompany) {
-      sendResponse(res, {
-        status: 404,
-        success: false,
-        error_code: MESSAGE_CODES.SUCCESS.NOT_FOUND,
-      });
-      return;
-    }
+    const { description, address, provinceId, website } = parsed.data;
 
     const updatedCompany = await db.company.update({
       where: {
-        id,
+        accountId: companyId,
       },
       data: {
         description,
         address,
         provinceId,
         website,
-        logo,
+        logo: logoFile ? logoFile.path : company.logo,
       },
     });
     if (updatedCompany) {
@@ -641,6 +645,45 @@ export const updateCompany = async (req: Request, res: Response) => {
       });
       return;
     }
+  } catch (error) {
+    console.error(error);
+    if (uploadedLogoPublicId)
+      await cloudinary.uploader.destroy(uploadedLogoPublicId);
+    sendResponse(res, {
+      status: 500,
+      success: false,
+      error_code: MESSAGE_CODES.SEVER.INTERNAL_SERVER_ERROR,
+    });
+  }
+};
+
+export const getCompanyCurrent = async (req: Request, res: Response) => {
+  try {
+    const companyId = req.user?.id;
+
+    const company = await db.company.findUnique({
+      where: {
+        accountId: companyId,
+        status: 1, // 1 for active companies
+      },
+      include: {
+        province: true,
+      },
+    });
+    if (!company) {
+      sendResponse(res, {
+        status: 404,
+        success: false,
+        error_code: MESSAGE_CODES.SUCCESS.NOT_FOUND,
+      });
+      return;
+    }
+    sendResponse(res, {
+      status: 200,
+      success: true,
+      data: company,
+      message_code: MESSAGE_CODES.SUCCESS.GET_SUCCESS,
+    });
   } catch (error) {
     console.error(error);
     sendResponse(res, {

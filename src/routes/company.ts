@@ -1,7 +1,8 @@
+import { uploadMixedCloud } from "@/config/cloudinary.config";
 import {
   getCompanies,
   getCompanyById,
-  updateCompany,
+  updateCompanyInfo,
   getCompaniesWithoutApproved,
   getCompanyPendingById,
   changeStatusCompany,
@@ -9,6 +10,7 @@ import {
   getCompanyByIdForUser,
   getJobsCurrentCompanyById,
   getAccountCompanyStatus,
+  getCompanyCurrent,
 } from "@/controllers/company";
 
 import { authenticate } from "@/middlewares/authenticate";
@@ -29,6 +31,21 @@ companyRouter.get("/company/verification-status", getAccountCompanyStatus);
 
 companyRouter.get("/companies", getCompaniesForUser);
 
+companyRouter.patch(
+  "/company/update-info",
+  authenticate,
+  authorize(Role.COMPANY),
+  uploadMixedCloud.fields([{ name: "logo", maxCount: 1 }]),
+  updateCompanyInfo
+);
+
+companyRouter.get(
+  "/company/current",
+  authenticate,
+  authorize(Role.COMPANY),
+  getCompanyCurrent
+);
+
 companyRouter.get("/company/:id", getCompanyByIdForUser);
 
 companyRouter.get("/company/:id/jobs", getJobsCurrentCompanyById);
@@ -45,13 +62,6 @@ companyRouter.get(
   authenticate,
   authorize(Role.ADMIN),
   getCompanyPendingById
-);
-
-companyRouter.put(
-  "/admin/company/:id",
-  authenticate,
-  authorize(Role.COMPANY),
-  updateCompany
 );
 
 companyRouter.patch(

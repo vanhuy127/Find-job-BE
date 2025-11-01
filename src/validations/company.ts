@@ -45,7 +45,7 @@ export const updateCompanySchema = z.object({
     .string()
     .url({ message: "Please enter a valid website URL." })
     .optional(),
-  logo: z.string().min(3, { message: "Please upload a company logo." }),
+  logo: z.union([fileSchema, z.string().url().optional()]).optional(),
 });
 
 export const approveCompanySchema = z
