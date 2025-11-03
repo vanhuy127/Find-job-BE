@@ -70,7 +70,6 @@ model User {
   accountId String?  @unique
 
   applications Application[]
-  skills       UserSkill[]
   reviews      CompanyReview[]
 }
 
@@ -87,6 +86,7 @@ model Company {
   businessLicensePath String
   status              Int       @default(-1) // -1: pending, 0: rejected, 1: approved
   reasonReject        String?
+  postLimit           Int       @default(10)
   createdAt           DateTime  @default(now()) @db.Timestamp(6)
   updatedAt           DateTime? @updatedAt @db.Timestamp(6)
 
@@ -143,18 +143,7 @@ model Skill {
   updatedAt DateTime? @updatedAt @db.Timestamp(6)
   isDeleted Boolean   @default(false)
 
-  userSkills UserSkill[]
   jobSkills  JobSkill[]
-}
-
-model UserSkill {
-  userId  String
-  skillId String
-
-  user  User  @relation(fields: [userId], references: [id])
-  skill Skill @relation(fields: [skillId], references: [id])
-
-  @@id([userId, skillId])
 }
 
 model JobSkill {
@@ -184,6 +173,7 @@ model VipPackage {
   numPost     Int
   price       Int
   durationDay Int
+  priority    Int      @default(0) //0 = BASIC, 1 = SILVER, 2 = GOLD, 3 = PLATINUM, 4 = DIAMOND
   createdAt   DateTime @default(now()) @db.Timestamp(6)
   isDeleted   Boolean  @default(false)
 
@@ -194,8 +184,8 @@ model Company_VipPackage {
   id           String   @id @default(uuid())
   companyId    String
   vipPackageId String
-  startDate    DateTime
   endDate      DateTime
+  remainingPosts Int
   createdAt    DateTime @default(now()) @db.Timestamp(6)
 
   company    Company    @relation(fields: [companyId], references: [id])
