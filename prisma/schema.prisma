@@ -170,7 +170,7 @@ model CompanyReview {
 model VipPackage {
   id          String   @id @default(uuid())
   name        String
-  description String   @db.Text
+  description String?   @db.Text
   numPost     Int
   price       Int
   durationDay Int

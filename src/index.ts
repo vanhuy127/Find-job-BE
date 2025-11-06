@@ -8,6 +8,7 @@ import jobRouter from "./routes/job";
 import skillRouter from "./routes/skill";
 import resumeRouter from "./routes/resume";
 import statRouter from "./routes/statistics";
+import vipPackageRouter from "./routes/vippackage";
 
 require("dotenv").config();
 
@@ -44,6 +45,7 @@ app.use("/api/v1", jobRouter);
 app.use("/api/v1", skillRouter);
 app.use("/api/v1", resumeRouter);
 app.use("/api/v1", statRouter);
+app.use("/api/v1", vipPackageRouter);
 
 // const rateLimitErrorHandler: express.ErrorRequestHandler = (
 //   err,
