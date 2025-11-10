@@ -1,4 +1,5 @@
 import {
+  changeStatusFailed,
   createOrder,
   createVipPackage,
   deleteVipPackage,
@@ -54,6 +55,13 @@ vipPackageRouter.get(
   authenticate,
   authorize(Role.COMPANY),
   getOrderById
+);
+
+vipPackageRouter.patch(
+  "/company/order/:id/failed",
+  authenticate,
+  authorize(Role.COMPANY),
+  changeStatusFailed
 );
 
 export default vipPackageRouter;

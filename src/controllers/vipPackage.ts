@@ -409,6 +409,23 @@ export const createOrder = async (req: Request, res: Response) => {
       });
       return;
     }
+
+    const pendingOrder = await db.company_VipPackage.findFirst({
+      where: {
+        companyId: company.id,
+        status: "PENDING",
+      },
+    });
+
+    if (pendingOrder) {
+      sendResponse(res, {
+        status: 400,
+        success: false,
+        error_code: MESSAGE_CODES.VALIDATION.EXISTING_PENDING_ORDER,
+      });
+      return;
+    }
+
     const endDate = new Date();
     endDate.setUTCDate(endDate.getUTCDate() + vipPackage.durationDay);
     endDate.setUTCHours(0, 0, 0, 0);
@@ -476,6 +493,42 @@ export const getOrderById = async (req: Request, res: Response) => {
       status: 200,
       success: true,
       data: cvp,
+    });
+  } catch (error) {
+    console.error(error);
+    sendResponse(res, {
+      status: 500,
+      success: false,
+      error_code: MESSAGE_CODES.SEVER.INTERNAL_SERVER_ERROR,
+    });
+  }
+};
+
+export const changeStatusFailed = async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id;
+
+    if (!id) {
+      sendResponse(res, {
+        status: 400,
+        success: false,
+        message_code: MESSAGE_CODES.VALIDATION.ID_REQUIRED,
+      });
+      return;
+    }
+
+    const cvp = await db.company_VipPackage.update({
+      where: { id },
+      data: {
+        status: "FAILED",
+      },
+    });
+
+    sendResponse(res, {
+      status: 200,
+      success: true,
+      data: cvp,
+      message_code: MESSAGE_CODES.SUCCESS.UPDATED_SUCCESS,
     });
   } catch (error) {
     console.error(error);
