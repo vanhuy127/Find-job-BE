@@ -57,7 +57,7 @@ export const register = async (req: Request, res: Response) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    let parsedDob = parseDate(dob, DATE_FORMAT);
+    let parsedDob = parseDate(dob);
     if (!isValid(parsedDob)) {
       sendResponse(res, {
         status: 400,

@@ -1,8 +1,11 @@
 import {
+  createOrder,
   createVipPackage,
   deleteVipPackage,
+  getOrderById,
   getVipPackage,
   getVipPackageById,
+  getVipPackageForCompany,
   updateVipPackage,
 } from "@/controllers/vipPackage";
 import { authenticate } from "@/middlewares/authenticate";
@@ -13,6 +16,8 @@ import express from "express";
 const vipPackageRouter = express.Router();
 
 vipPackageRouter.get("/admin/vip-packages", getVipPackage);
+
+vipPackageRouter.get("/company/vip-packages", getVipPackageForCompany);
 
 vipPackageRouter.get("/admin/vip-package/:id", getVipPackageById);
 
@@ -35,6 +40,20 @@ vipPackageRouter.delete(
   authenticate,
   authorize(Role.ADMIN),
   deleteVipPackage
+);
+
+vipPackageRouter.post(
+  "/company/order",
+  authenticate,
+  authorize(Role.COMPANY),
+  createOrder
+);
+
+vipPackageRouter.get(
+  "/company/order/:id",
+  authenticate,
+  authorize(Role.COMPANY),
+  getOrderById
 );
 
 export default vipPackageRouter;

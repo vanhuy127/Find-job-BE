@@ -44,7 +44,7 @@ export const createJob = async (req: Request, res: Response) => {
       skills,
     } = parsed.data;
 
-    const parsedEndDate = parseDate(endDate, DATE_FORMAT);
+    const parsedEndDate = parseDate(endDate);
     if (!isValid(parsedEndDate)) {
       sendResponse(res, {
         status: 400,
@@ -728,7 +728,7 @@ export const updateJob = async (req: Request, res: Response) => {
       skills,
     } = parsed.data;
 
-    const parsedEndDate = parseDate(endDate, DATE_FORMAT);
+    const parsedEndDate = parseDate(endDate);
     if (!isValid(parsedEndDate)) {
       sendResponse(res, {
         status: 400,

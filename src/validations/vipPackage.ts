@@ -11,3 +11,7 @@ export const vipPackageSchema = z.object({
     errorMap: () => ({ message: "Invalid VIP package level" }),
   }),
 });
+
+export const orderVipPackageSchema = z.object({
+  vipPackageId: z.string().uuid("Invalid VIP Package ID"),
+});

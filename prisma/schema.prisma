@@ -42,6 +42,12 @@ enum ApplicationStatus {
   REJECTED
 }
 
+enum OrderStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
 model Account {
   id           String    @id @default(uuid())
   email        String
@@ -187,6 +193,7 @@ model Company_VipPackage {
   vipPackageId String
   endDate      DateTime
   remainingPosts Int
+  status      OrderStatus @default(PENDING)
   createdAt    DateTime @default(now()) @db.Timestamp(6)
 
   company    Company    @relation(fields: [companyId], references: [id])

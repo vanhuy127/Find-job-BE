@@ -12,7 +12,10 @@ import {
   sendListResponse,
   sendResponse,
 } from "@/utils";
-import { vipPackageSchema } from "@/validations/vipPackage";
+import {
+  orderVipPackageSchema,
+  vipPackageSchema,
+} from "@/validations/vipPackage";
 
 export const createVipPackage = async (req: Request, res: Response) => {
   try {
@@ -100,6 +103,49 @@ export const getVipPackage = async (req: Request, res: Response) => {
           page,
           size,
           totalPages,
+        },
+        message_code: MESSAGE_CODES.SUCCESS.GET_ALL_SUCCESS,
+      });
+      return;
+    }
+    sendResponse(res, {
+      status: 404,
+      success: true,
+      data: [],
+      error_code: MESSAGE_CODES.SUCCESS.NOT_FOUND,
+    });
+  } catch (error) {
+    console.error(error);
+    sendResponse(res, {
+      status: 500,
+      success: false,
+      error_code: MESSAGE_CODES.SEVER.INTERNAL_SERVER_ERROR,
+    });
+    return;
+  }
+};
+
+export const getVipPackageForCompany = async (req: Request, res: Response) => {
+  try {
+    const vipPackage = await db.vipPackage.findMany({
+      where: {
+        isDeleted: false,
+      },
+      orderBy: {
+        price: "asc",
+      },
+    });
+
+    if (vipPackage) {
+      sendListResponse(res, {
+        status: 200,
+        success: true,
+        data: vipPackage,
+        pagination: {
+          total: vipPackage.length,
+          page: 1,
+          size: vipPackage.length,
+          totalPages: 1,
         },
         message_code: MESSAGE_CODES.SUCCESS.GET_ALL_SUCCESS,
       });
@@ -311,6 +357,126 @@ export const deleteVipPackage = async (req: Request, res: Response) => {
       message_code: MESSAGE_CODES.SUCCESS.DELETED_SUCCESS,
     });
     return;
+  } catch (error) {
+    console.error(error);
+    sendResponse(res, {
+      status: 500,
+      success: false,
+      error_code: MESSAGE_CODES.SEVER.INTERNAL_SERVER_ERROR,
+    });
+  }
+};
+
+export const createOrder = async (req: Request, res: Response) => {
+  try {
+    const parsed = orderVipPackageSchema.safeParse(req.body);
+    if (!parsed.success) {
+      sendResponse(res, {
+        status: 400,
+        success: false,
+        error_code: MESSAGE_CODES.VALIDATION.VALIDATION_ERROR,
+        errors: parsed.error.errors.map((err) => ({
+          field: err.path.join("."),
+          error_code: err.message,
+        })),
+      });
+      return;
+    }
+
+    const companyId = req.user?.id;
+
+    const { vipPackageId } = parsed.data;
+
+    const [company, vipPackage] = await Promise.all([
+      db.company.findFirst({
+        where: {
+          accountId: companyId,
+        },
+      }),
+      db.vipPackage.findFirst({
+        where: {
+          id: vipPackageId,
+          isDeleted: false,
+        },
+      }),
+    ]);
+
+    if (!company || !vipPackage) {
+      sendResponse(res, {
+        status: 404,
+        success: false,
+        error_code: MESSAGE_CODES.SUCCESS.NOT_FOUND,
+      });
+      return;
+    }
+    const endDate = new Date();
+    endDate.setUTCDate(endDate.getUTCDate() + vipPackage.durationDay);
+    endDate.setUTCHours(0, 0, 0, 0);
+
+    const vipPackageOrder = await db.company_VipPackage.create({
+      data: {
+        companyId: company.id,
+        vipPackageId: vipPackage.id,
+        endDate,
+        remainingPosts: vipPackage.numPost,
+      },
+    });
+
+    sendResponse(res, {
+      status: 201,
+      success: true,
+      data: vipPackageOrder,
+      message_code: MESSAGE_CODES.SUCCESS.CREATED_SUCCESS,
+    });
+  } catch (error) {
+    console.error(error);
+    sendResponse(res, {
+      status: 500,
+      success: false,
+      error_code: MESSAGE_CODES.SEVER.INTERNAL_SERVER_ERROR,
+    });
+  }
+};
+
+export const getOrderById = async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id;
+
+    if (!id) {
+      sendResponse(res, {
+        status: 400,
+        success: false,
+        message_code: MESSAGE_CODES.VALIDATION.ID_REQUIRED,
+      });
+      return;
+    }
+
+    const cvp = await db.company_VipPackage.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        endDate: true,
+        remainingPosts: true,
+        status: true,
+        createdAt: true,
+        vipPackage: true,
+      },
+    });
+
+    if (!cvp) {
+      sendResponse(res, {
+        status: 404,
+        success: false,
+        error_code: MESSAGE_CODES.SUCCESS.NOT_FOUND,
+      });
+      return;
+    }
+
+    sendResponse(res, {
+      status: 200,
+      success: true,
+      data: cvp,
+    });
   } catch (error) {
     console.error(error);
     sendResponse(res, {

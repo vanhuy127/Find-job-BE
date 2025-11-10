@@ -9,6 +9,7 @@ import skillRouter from "./routes/skill";
 import resumeRouter from "./routes/resume";
 import statRouter from "./routes/statistics";
 import vipPackageRouter from "./routes/vippackage";
+import paymentRouter from "./routes/payment";
 
 require("dotenv").config();
 
@@ -39,13 +40,14 @@ app.use(express.json());
 
 app.use("/api/v1", userRouter);
 app.use("/api/v1", authRouter);
+app.use("/api/v1", vipPackageRouter);
 app.use("/api/v1", companyRouter);
 app.use("/api/v1", provinceRouter);
 app.use("/api/v1", jobRouter);
 app.use("/api/v1", skillRouter);
 app.use("/api/v1", resumeRouter);
 app.use("/api/v1", statRouter);
-app.use("/api/v1", vipPackageRouter);
+app.use("/api/v1", paymentRouter);
 
 // const rateLimitErrorHandler: express.ErrorRequestHandler = (
 //   err,
