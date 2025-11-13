@@ -425,7 +425,7 @@ export const createOrder = async (req: Request, res: Response) => {
       });
       return;
     }
-
+    //bổ sung chỉ cộng thêm ngày không set giá trị về 0h0'0''
     const endDate = new Date();
     endDate.setUTCDate(endDate.getUTCDate() + vipPackage.durationDay);
     endDate.setUTCHours(0, 0, 0, 0);
@@ -529,6 +529,58 @@ export const changeStatusFailed = async (req: Request, res: Response) => {
       success: true,
       data: cvp,
       message_code: MESSAGE_CODES.SUCCESS.UPDATED_SUCCESS,
+    });
+  } catch (error) {
+    console.error(error);
+    sendResponse(res, {
+      status: 500,
+      success: false,
+      error_code: MESSAGE_CODES.SEVER.INTERNAL_SERVER_ERROR,
+    });
+  }
+};
+
+export const getVipPackageBought = async (req: Request, res: Response) => {
+  try {
+    const companyId = req.user?.id;
+
+    const company = await db.company.findUnique({
+      where: {
+        accountId: companyId,
+        status: 1,
+      },
+    });
+
+    if (!company) {
+      sendResponse(res, {
+        status: 404,
+        success: false,
+        error_code: MESSAGE_CODES.SUCCESS.NOT_FOUND,
+      });
+      return;
+    }
+
+    const cvp = await db.company_VipPackage.findFirst({
+      where: { companyId: company.id, status: "SUCCESS" },
+      orderBy: { createdAt: "desc" },
+      include: {
+        vipPackage: true,
+      },
+    });
+
+    if (!cvp) {
+      sendResponse(res, {
+        status: 404,
+        success: false,
+        error_code: MESSAGE_CODES.SUCCESS.NOT_FOUND,
+      });
+      return;
+    }
+
+    sendResponse(res, {
+      status: 200,
+      success: true,
+      data: cvp,
     });
   } catch (error) {
     console.error(error);

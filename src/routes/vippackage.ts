@@ -5,6 +5,7 @@ import {
   deleteVipPackage,
   getOrderById,
   getVipPackage,
+  getVipPackageBought,
   getVipPackageById,
   getVipPackageForCompany,
   updateVipPackage,
@@ -62,6 +63,13 @@ vipPackageRouter.patch(
   authenticate,
   authorize(Role.COMPANY),
   changeStatusFailed
+);
+
+vipPackageRouter.get(
+  "/company/vip-package-bought",
+  authenticate,
+  authorize(Role.COMPANY),
+  getVipPackageBought
 );
 
 export default vipPackageRouter;
