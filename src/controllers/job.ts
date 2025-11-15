@@ -9,7 +9,6 @@ import {
   DATE_SETTINGS,
 } from "@/utils";
 import { isValid } from "date-fns";
-import { DATE_FORMAT } from "@/constants/date";
 import { DEFAULT_PAGE, DEFAULT_SIZE, MESSAGE_CODES } from "@/constants";
 import { jobSchema } from "@/validations";
 import { JobLevel, JobType } from "@prisma/client";
@@ -42,6 +41,7 @@ export const createJob = async (req: Request, res: Response) => {
       salaryMax,
       endDate,
       skills,
+      vipPackage,
     } = parsed.data;
 
     const parsedEndDate = parseDate(endDate);
@@ -72,6 +72,58 @@ export const createJob = async (req: Request, res: Response) => {
       return;
     }
 
+    let selectedVipPackageId: string | undefined = undefined;
+
+    if (vipPackage === "default") {
+      if (company.postLimit <= 0) {
+        sendResponse(res, {
+          status: 400,
+          success: false,
+          error_code: MESSAGE_CODES.VALIDATION.OUT_OF_POST_LIMIT,
+        });
+        return;
+      }
+
+      await db.company.update({
+        where: { id: company.id },
+        data: { postLimit: { decrement: 1 } },
+      });
+    } else {
+      const vipRecord = await db.company_VipPackage.findFirst({
+        where: {
+          vipPackageId: vipPackage,
+          companyId: company.id,
+          status: "SUCCESS",
+        },
+        include: { vipPackage: true },
+      });
+
+      if (!vipRecord) {
+        sendResponse(res, {
+          status: 400,
+          success: false,
+          error_code: MESSAGE_CODES.VALIDATION.VIP_PACKAGE_NOT_FOUND,
+        });
+        return;
+      }
+
+      if (vipRecord.remainingPosts <= 0) {
+        sendResponse(res, {
+          status: 400,
+          success: false,
+          error_code: MESSAGE_CODES.VALIDATION.OUT_OF_VIP_POST,
+        });
+        return;
+      }
+
+      selectedVipPackageId = vipRecord.vipPackageId;
+
+      await db.company_VipPackage.update({
+        where: { id: vipRecord.id },
+        data: { remainingPosts: { decrement: 1 } },
+      });
+    }
+
     const job = await db.job.create({
       data: {
         title,
@@ -85,6 +137,9 @@ export const createJob = async (req: Request, res: Response) => {
         company: { connect: { id: company.id } },
         numApplications,
         province: { connect: { id: province } },
+        ...(selectedVipPackageId
+          ? { vipPackage: { connect: { id: selectedVipPackageId } } }
+          : {}),
         skills: {
           create: skills.map((skill) => ({
             skill: { connect: { id: skill } },
@@ -92,6 +147,7 @@ export const createJob = async (req: Request, res: Response) => {
         },
       },
       include: {
+        vipPackage: true,
         skills: {
           include: {
             skill: true,
