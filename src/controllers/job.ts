@@ -404,10 +404,18 @@ export const getJobsForUser = async (req: Request, res: Response) => {
             skill: true,
           },
         },
+        vipPackage: true,
       },
-      orderBy: {
-        createdAt: "desc",
-      },
+      orderBy: [
+        {
+          createdAt: "desc",
+        },
+        {
+          vipPackage: {
+            priority: "desc",
+          },
+        },
+      ],
     });
 
     if (jobs) {
@@ -645,6 +653,13 @@ export const getJobsCurrentCompany = async (req: Request, res: Response) => {
             accountId: true,
           },
         },
+        vipPackage: {
+          select: {
+            id: true,
+            name: true,
+            priority: true,
+          },
+        },
       },
       orderBy: {
         createdAt: "desc",
@@ -705,6 +720,7 @@ export const getJobById = async (req: Request, res: Response) => {
             skill: true,
           },
         },
+        vipPackage: true,
       },
     });
 

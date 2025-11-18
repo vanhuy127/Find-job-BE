@@ -19,12 +19,8 @@ export const jobSchema = z.object({
   skills: z.array(z.string()).nonempty("At least one skill is required"),
   vipPackage: z
     .string()
-    .refine(
-      (val) =>
-        val === "none" || val === "default" || /^[0-9a-fA-F-]{36}$/.test(val),
-      {
-        message: "vipPackage must be 'none', 'default' or a valid UUID",
-      }
-    )
+    .refine((val) => val === "default" || /^[0-9a-fA-F-]{36}$/.test(val), {
+      message: "vipPackage must be 'none', 'default' or a valid UUID",
+    })
     .optional(),
 });
