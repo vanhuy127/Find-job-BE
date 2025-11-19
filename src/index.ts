@@ -1,4 +1,3 @@
-import cookieParser from "cookie-parser";
 import express from "express";
 import userRouter from "@/routes/user";
 import authRouter from "@/routes/auth";
@@ -17,7 +16,6 @@ const cors = require("cors");
 const morgan = require("morgan");
 const app = express();
 
-app.use(cookieParser());
 app.use(
   cors({
     origin: ["http://localhost:5173"],
