@@ -305,18 +305,10 @@ export const login = async (req: Request, res: Response) => {
       role: account.role,
     });
 
-    res.cookie("refresh_token", refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      path: "/api/v1/auth/refresh-token",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
-
     sendResponse(res, {
       status: 200,
       success: true,
-      data: { ...userInfo, accessToken },
+      data: { ...userInfo, accessToken, refreshToken },
       message_code: "LOGIN_SUCCESS",
     });
   } catch (error) {
@@ -332,7 +324,7 @@ export const login = async (req: Request, res: Response) => {
 
 export const refreshAccessToken = (req: Request, res: Response) => {
   try {
-    const token = req.cookies.refresh_token;
+    const token = req.body.refreshToken;
     if (!token) {
       sendResponse(res, {
         status: 401,
@@ -503,29 +495,6 @@ export const changePassword = async (req: Request, res: Response) => {
       status: 500,
       success: false,
       error_code: MESSAGE_CODES.SEVER.INTERNAL_SERVER_ERROR,
-    });
-  }
-};
-
-export const logout = async (req: Request, res: Response) => {
-  try {
-    res.clearCookie("refresh_token", {
-      httpOnly: true,
-      sameSite: "strict",
-      secure: process.env.NODE_ENV === "production",
-      path: "/api/v1/auth/refresh-token",
-    });
-    sendResponse(res, {
-      status: 200,
-      success: true,
-      message_code: "LOGGED_OUT",
-    });
-  } catch (error) {
-    console.error("Error during logout:", error);
-    sendResponse(res, {
-      status: 500,
-      success: false,
-      error_code: "INTERNAL_SERVER_ERROR",
     });
   }
 };

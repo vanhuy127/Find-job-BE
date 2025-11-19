@@ -1,7 +1,6 @@
 import { uploadMixedCloud } from "@/config/cloudinary.config";
 import {
   login,
-  logout,
   refreshAccessToken,
   changePassword,
   lockAccount,
@@ -34,9 +33,7 @@ authRouter.post(
 
 authRouter.post("/auth/login", login);
 
-authRouter.get("/auth/refresh-token", refreshAccessToken);
-
-authRouter.get("/auth/logout", authenticate, logout);
+authRouter.post("/auth/refresh-token", refreshAccessToken);
 
 authRouter.get("/auth/me", authenticate, getMe);
 
