@@ -408,12 +408,17 @@ export const getJobsForUser = async (req: Request, res: Response) => {
       },
       orderBy: [
         {
-          createdAt: "desc",
-        },
-        {
           vipPackage: {
             priority: "desc",
           },
+        },
+        {
+          vipPackage: {
+            id: "desc", // vipPackage != null sẽ được đưa lên trước
+          },
+        },
+        {
+          createdAt: "desc",
         },
       ],
     });
